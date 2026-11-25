@@ -68,9 +68,16 @@ export async function POST(request: Request) {
   }
   if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
 
-  const supabase = await createClient();
+  let supabase;
+  try {
+    supabase = await createClient();
+  } catch {
+    return fail("DATABASE_NOT_CONFIGURED", "Private database access is not configured.", 503);
+  }
+
   const nexusDecision = evaluateRequestForApproval(payload.message);
   if (!nexusDecision.allowed) {
+    // The block remains effective even if audit storage is temporarily unavailable.
     await supabase.from("security_audit_events").insert({
       user_id: owner.user.id,
       event_type: "assistant_request_blocked",
@@ -90,7 +97,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Fail closed if the private-data encryption key is missing or invalid.
     encryptPrivateData("configuration-check");
   } catch {
     return fail("PRIVATE_STORAGE_NOT_CONFIGURED", "Private storage is not configured with a valid encryption key.", 503);
@@ -119,7 +125,6 @@ export async function POST(request: Request) {
   }
 
   let conversationId = payload.conversationId as string | undefined;
-
   if (conversationId) {
     const { data, error } = await supabase
       .from("conversations")
@@ -145,7 +150,6 @@ export async function POST(request: Request) {
     .eq("user_id", owner.user.id)
     .order("created_at", { ascending: true })
     .limit(30);
-
   if (historyError) return fail("MEMORY_STORE_UNAVAILABLE", "Could not load conversation history.", 503);
 
   const userMessage = { role: "user" as const, content: payload.message.trim() };
@@ -159,16 +163,25 @@ export async function POST(request: Request) {
       .order("updated_at", { ascending: false })
       .limit(25);
     if (memoryError) return fail("MEMORY_STORE_UNAVAILABLE", "Could not load saved memory.", 503);
-    savedMemories = (memoryRows ?? []).map(row => decryptPrivateData(row.content));
+    try {
+      savedMemories = (memoryRows ?? []).map(row => decryptPrivateData(row.content));
+    } catch {
+      return fail("PRIVATE_DATA_UNREADABLE", "Saved memory could not be decrypted. Check the encryption key.", 503);
+    }
   }
 
-  const providerMessages = buildConversation([
-    ...(history ?? []).map(item => ({
-      role: item.role as "user" | "assistant",
-      content: decryptPrivateData(item.content)
-    })),
-    userMessage
-  ], savedMemories);
+  let providerMessages;
+  try {
+    providerMessages = buildConversation([
+      ...(history ?? []).map(item => ({
+        role: item.role as "user" | "assistant",
+        content: decryptPrivateData(item.content)
+      })),
+      userMessage
+    ], savedMemories);
+  } catch {
+    return fail("PRIVATE_DATA_UNREADABLE", "Conversation history could not be decrypted. Check the encryption key.", 503);
+  }
 
   const generated = await generateAssistantReply(providerMessages);
   if (!generated.ok) {
