@@ -99,3 +99,28 @@ create policy "Users can read their own security events"
 create policy "Users can append their own security events"
   on public.security_audit_events for insert to authenticated
   with check (auth.uid() = user_id);
+
+-- Create the default FRIDAY profile automatically when an auth user is added.
+create or replace function public.handle_new_friday_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.friday_profiles(user_id, display_name)
+  values (new.id, 'Boss')
+  on conflict (user_id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_friday_auth_user_created on auth.users;
+create trigger on_friday_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_friday_user();
+
+-- Backfill profiles for accounts created before this migration was applied.
+insert into public.friday_profiles(user_id, display_name)
+select id, 'Boss' from auth.users
+on conflict (user_id) do nothing;
