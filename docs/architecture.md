@@ -31,6 +31,8 @@ The current branch contains a private workspace foundation, Supabase authenticat
 2. AES-256-GCM uses a 12-byte random nonce and authentication tag for each value.
 3. `FRIDAY_DATA_ENCRYPTION_KEY` must be a base64-encoded 32-byte key.
 4. Losing the encryption key makes encrypted content unrecoverable. Store a secure offline backup and do not store the key in the database or GitHub.
+5. Encrypted values use the versioned `friday:v1:` envelope. Unsupported formats, malformed Base64 and unencrypted legacy plaintext are rejected; there is no automatic plaintext fallback.
+6. Before introducing key rotation or a new envelope version, implement and test an explicit owner-authorised migration with verified backups. Never silently rewrite stored ciphertext.
 5. Database transport and provider transport must use HTTPS.
 6. Data retention and deletion must remain owner-controlled. No automatic deletion policy is enabled.
 
