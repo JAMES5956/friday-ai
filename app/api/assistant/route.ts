@@ -136,7 +136,7 @@ export async function POST(request: Request) {
   } else {
     const { data, error } = await supabase
       .from("conversations")
-      .insert({ user_id: owner.user.id, title: payload.message.trim().slice(0, 72) })
+      .insert({ user_id: owner.user.id, title: "Private conversation" })
       .select("id")
       .single();
     if (error || !data) return fail("MEMORY_STORE_UNAVAILABLE", "Could not create a conversation. Check the database setup.", 503);
