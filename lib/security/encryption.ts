@@ -25,7 +25,9 @@ export function encryptPrivateData(plainText: string) {
 }
 
 export function decryptPrivateData(value: string) {
-  if (!value.startsWith(PREFIX)) return value;
+  if (!value.startsWith(PREFIX)) {
+    throw new Error("Stored private data is not encrypted with a supported FRIDAY format.");
+  }
   const key = getEncryptionKey();
   const payload = Buffer.from(value.slice(PREFIX.length), "base64");
   if (payload.length < 29) throw new Error("Encrypted data is incomplete.");
