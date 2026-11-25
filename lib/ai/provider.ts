@@ -10,6 +10,12 @@ type ProviderResponse = {
 
 function getChatCompletionsUrl(baseUrl: string) {
   const normalized = baseUrl.trim().replace(/\/+$/, "");
+  const parsed = new URL(normalized);
+  const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
+  const isLocalHttp = parsed.protocol === "http:" && localHosts.has(parsed.hostname);
+  if (parsed.protocol !== "https:" && !isLocalHttp) return null;
+  if (parsed.username || parsed.password || parsed.search || parsed.hash) return null;
+
   return normalized.endsWith("/v1")
     ? `${normalized}/chat/completions`
     : `${normalized}/v1/chat/completions`;
@@ -24,9 +30,19 @@ export async function generateAssistantReply(messages: ChatMessage[]) {
     return { ok: false as const, code: "AI_PROVIDER_NOT_CONFIGURED" };
   }
 
+  let endpoint: string | null;
+  try {
+    endpoint = getChatCompletionsUrl(baseUrl);
+  } catch {
+    endpoint = null;
+  }
+  if (!endpoint) {
+    return { ok: false as const, code: "AI_PROVIDER_URL_INVALID" };
+  }
+
   let response: Response;
   try {
-    response = await fetch(getChatCompletionsUrl(baseUrl), {
+    response = await fetch(endpoint, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
