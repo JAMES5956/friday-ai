@@ -86,6 +86,17 @@ export async function POST(request: Request) {
     return fail("PRIVATE_STORAGE_NOT_CONFIGURED", "Private storage is not configured with a valid encryption key.", 503);
   }
   const supabase = await createClient();
+  const { data: withinLimit, error: rateLimitError } = await supabase.rpc(
+    "consume_rate_limit",
+    { p_limit: 15 }
+  );
+  if (rateLimitError) {
+    return fail("SECURITY_LIMITER_UNAVAILABLE", "NEXUS request protection is not configured. Apply the security migration.", 503);
+  }
+  if (!withinLimit) {
+    return fail("RATE_LIMITED", "Too many requests. Wait a minute before trying again.", 429);
+  }
+
   let conversationId = payload.conversationId as string | undefined;
 
   if (conversationId) {
