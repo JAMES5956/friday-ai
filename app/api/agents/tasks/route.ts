@@ -1,0 +1,89 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { getOwnerSession } from "@/lib/auth/owner";
+import { encryptPrivateData, decryptPrivateData } from "@/lib/security/encryption";
+import { evaluateRequestForApproval } from "@/lib/security/nexus";
+import { specialistAgents } from "@/lib/agents/registry";
+
+export const dynamic = "force-dynamic";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function fail(code: string, message: string, status: number) {
+  return NextResponse.json({ error: { code, message } }, { status, headers: { "Cache-Control": "no-store" } });
+}
+
+export async function GET() {
+  try {
+    const owner = await getOwnerSession();
+    if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
+    const supabase = await createClient();
+    const { data, error } = await supabase.from("agent_tasks")
+      .select("id, assigned_agent_id, created_by_agent_id, title, status, task_ciphertext, result_ciphertext, requires_owner_approval, owner_approved_at, created_at, updated_at")
+      .eq("owner_id", owner.user.id).order("created_at", { ascending: false }).limit(50);
+    if (error) return fail("TASK_STORAGE_UNAVAILABLE", "Task storage is unavailable. Apply migrations 0003 and 0004.", 503);
+    const tasks = (data ?? []).map(task => {
+      let description = "";
+      let result: string | null = null;
+      try { description = decryptPrivateData(task.task_ciphertext); } catch { description = "[Encrypted task cannot be read with the current key]"; }
+      if (task.result_ciphertext) {
+        try { result = decryptPrivateData(task.result_ciphertext); } catch { result = "[Encrypted result cannot be read with the current key]"; }
+      }
+      const { task_ciphertext: _task, result_ciphertext: _result, ...safe } = task;
+      return { ...safe, description, result };
+    });
+    return NextResponse.json({ tasks, executionEnabled: false }, { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return fail("TASK_SERVICE_UNAVAILABLE", "Task services are not configured.", 503);
+  }
+}
+
+export async function POST(request: Request) {
+  if (!(request.headers.get("content-type") ?? "").toLowerCase().includes("application/json")) {
+    return fail("UNSUPPORTED_MEDIA_TYPE", "Send application/json.", 415);
+  }
+  let payload: unknown;
+  try {
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).byteLength > 16384) return fail("REQUEST_TOO_LARGE", "Task request is too large.", 413);
+    payload = JSON.parse(raw);
+  } catch { return fail("INVALID_JSON", "Send valid JSON.", 400); }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return fail("INVALID_PAYLOAD", "Send a JSON object.", 400);
+  const input = payload as { agentId?: unknown; title?: unknown; description?: unknown };
+  if (typeof input.agentId !== "string" || !specialistAgents.some(agent => agent.id === input.agentId)) return fail("INVALID_AGENT", "Choose a registered specialist.", 400);
+  if (typeof input.title !== "string" || !input.title.trim() || input.title.trim().length > 160) return fail("INVALID_TITLE", "Task title must be 1–160 characters.", 400);
+  if (typeof input.description !== "string" || !input.description.trim() || input.description.length > 10000) return fail("INVALID_DESCRIPTION", "Task description must be 1–10,000 characters.", 400);
+
+  try {
+    const owner = await getOwnerSession();
+    if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
+    const supabase = await createClient();
+    const decision = evaluateRequestForApproval(input.description);
+    const status = decision.requiresApproval ? "awaiting_approval" : "queued";
+    const taskCiphertext = encryptPrivateData(input.description.trim());
+    const { data, error } = await supabase.from("agent_tasks").insert({
+      owner_id: owner.user.id,
+      assigned_agent_id: input.agentId,
+      created_by_agent_id: "friday",
+      title: input.title.trim(),
+      status,
+      task_ciphertext: taskCiphertext,
+      requires_owner_approval: decision.requiresApproval
+    }).select("id, assigned_agent_id, title, status, requires_owner_approval, created_at").single();
+    if (error || !data) return fail("TASK_CREATE_FAILED", "Could not save this task. Confirm migrations 0003 and 0004 are applied and encryption is configured.", 503);
+
+    const eventType = decision.requiresApproval ? "owner_approval_required" : "task_queued";
+    const { error: eventError } = await supabase.from("agent_task_events").insert({
+      owner_id: owner.user.id, task_id: data.id, actor_agent_id: "friday", event_type: eventType,
+      details_ciphertext: encryptPrivateData(JSON.stringify({ assignedAgentId: input.agentId, approvalRequired: decision.requiresApproval }))
+    });
+    if (eventError) {
+      await supabase.from("agent_tasks").delete().eq("id", data.id).eq("owner_id", owner.user.id);
+      return fail("TASK_AUDIT_FAILED", "Task was not retained because its audit event could not be recorded.", 503);
+    }
+    return NextResponse.json({ task: data, executionEnabled: false, message: decision.requiresApproval
+      ? "Task saved and held for your approval. No agent has executed it."
+      : "Task queued. Specialist execution is not enabled yet." }, { status: 201, headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return fail("TASK_SERVICE_UNAVAILABLE", "Task services or encryption are not configured.", 503);
+  }
+}
