@@ -16,7 +16,7 @@ const ROUTES: Array<{agentId: SpecialistAgentId;name:string;role:string;terms:st
 {agentId:"metric",name:"METRIC",role:"Quality metrics and observability",terms:["analytics dashboard","quality metrics","observability","monitoring metrics","kpi dashboard","error tracking"]}
 ];
 export function recommendSpecialist(message:string):AgentRecommendation|null {
-const normalized=` ${message.toLowerCase().replace(/[^\\p{L}\\p{N}]+/gu," ").trim()} `;
+const normalized=` ${message.toLowerCase().replace(/[^a-z0-9]+/g," ").trim()} `;
 const ranked=ROUTES.map(route=>({...route,score:route.terms.reduce((score,term)=>score+(normalized.includes(term)?(term.trim().includes(" ")?2:1):0),0)})).filter(route=>route.score>0).sort((a,b)=>b.score-a.score);
 if(!ranked.length||ranked[0].score<2)return null;
 if(ranked[1]&&ranked[0].score===ranked[1].score)return null;
