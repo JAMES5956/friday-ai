@@ -4,6 +4,7 @@ import { getOwnerSession } from "@/lib/auth/owner";
 import { encryptPrivateData, decryptPrivateData } from "@/lib/security/encryption";
 import { evaluateTaskForApproval } from "@/lib/security/nexus";
 import { specialistAgents } from "@/lib/agents/registry";
+import { resolveAgentModelConfig } from "@/lib/agents/runtime";
 
 export const dynamic = "force-dynamic";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -31,7 +32,7 @@ export async function GET() {
       const { task_ciphertext: _task, result_ciphertext: _result, ...safe } = task;
       return { ...safe, description, result };
     });
-    return NextResponse.json({ tasks, executionEnabled: false }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ tasks, executionEnabled: true, configuredAgents: specialistAgents.filter(agent => agent.id !== "friday" && agent.id !== "nexus" && resolveAgentModelConfig(agent.id)).map(agent => agent.id) }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return fail("TASK_SERVICE_UNAVAILABLE", "Task services are not configured.", 503);
   }
@@ -57,6 +58,9 @@ export async function POST(request: Request) {
     const owner = await getOwnerSession();
     if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
     const supabase = await createClient();
+    const { data: withinLimit, error: rateError } = await supabase.rpc("consume_rate_limit", { p_limit: 10 });
+    if (rateError) return fail("SECURITY_LIMITER_UNAVAILABLE", "NEXUS request protection is unavailable.", 503);
+    if (!withinLimit) return fail("RATE_LIMITED", "Too many task submissions. Wait before trying again.", 429);
     const decision = evaluateTaskForApproval(input.title, input.description);
     const status = decision.requiresApproval ? "awaiting_approval" : "queued";
     const taskCiphertext = encryptPrivateData(input.description.trim());
@@ -80,9 +84,9 @@ export async function POST(request: Request) {
       await supabase.from("agent_tasks").delete().eq("id", data.id).eq("owner_id", owner.user.id);
       return fail("TASK_AUDIT_FAILED", "Task was not retained because its audit event could not be recorded.", 503);
     }
-    return NextResponse.json({ task: data, executionEnabled: false, message: decision.requiresApproval
-      ? "Task saved and held for your approval. No agent has executed it."
-      : "Task queued. Specialist execution is not enabled yet." }, { status: 201, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ task: data, executionEnabled: true, modelConfigured: Boolean(resolveAgentModelConfig(input.agentId)), message: decision.requiresApproval
+      ? "Task saved and held for your approval. Approve it, then choose Run specialist when ready."
+      : resolveAgentModelConfig(input.agentId) ? "Task queued. Choose Run specialist when you are ready." : "Task queued. Configure this specialist’s dedicated model before running it." }, { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch {
     return fail("TASK_SERVICE_UNAVAILABLE", "Task services or encryption are not configured.", 503);
   }

@@ -13,7 +13,8 @@ The repository now contains:
 - OpenAI-compatible model-provider adapter, configurable through server-only environment variables.
 - FRIDAY system prompt and central conversation orchestrator.
 - NEXUS request gate plus an owner-controlled approval queue for sensitive delegated tasks.
-- Specialist-agent registry, owner-scoped encrypted task queue, explicit owner approval endpoint and workspace API. Task execution remains disabled.
+- Central specialist recommendation and explicit owner-controlled task handoff.
+- Owner-triggered specialist execution through dedicated per-agent model configuration, encrypted task results, task-event auditing and isolated private working memory. Specialists have no external-action tools; sensitive tasks require owner approval before execution.
 - Automated lint, TypeScript and production-build checks.
 
 This is a pre-deployment build. No public deployment has been performed. The application still requires private infrastructure configuration before authentication, database-backed memory and model responses can run.
@@ -39,7 +40,9 @@ Requirements: Node.js 20.9+ and npm.
 6. Run the SQL migrations in order: `0001_friday_core.sql`, `0002_nexus_rate_limits.sql`, then `0003_agent_workspaces.sql`, then `0004_task_approval_workflow.sql`.
 7. Generate an application encryption key locally with `openssl rand -base64 32` and set `FRIDAY_DATA_ENCRYPTION_KEY`. Keep a secure offline backup of this key. Losing it makes encrypted stored data unrecoverable.
 8. Configure `AI_BASE_URL`, `AI_MODEL`, and `AI_API_KEY` only after choosing and approving a model provider. The API key is server-only and must never use a `NEXT_PUBLIC_` prefix.
-9. Install and run:
+9. To enable a specialist, also set its dedicated model variable (for example `AI_ORACLE_MODEL` or `AI_FORGE_MODEL`). Specialist execution deliberately has no fallback to `AI_MODEL`; each delegated agent must have its own configured model. All configured models use the shared server-side provider URL and key.
+10. Apply migrations `0003_agent_workspaces.sql` and `0004_task_approval_workflow.sql` before using delegation, approvals or specialist memory.
+11. Install and run:
 
 ```bash
 npm install
@@ -68,7 +71,8 @@ GitHub Actions runs the same checks for commits to `main` and `foundation/**` br
 - If the encryption key is missing or invalid, private storage endpoints fail closed.
 - The assistant route does not execute external actions. Sensitive or potentially irreversible requests are blocked until a separate approval workflow is implemented.
 - A model provider must be configured before FRIDAY can generate responses.
-- Specialist-agent workspaces, encrypted-memory storage, owner-controlled memory-sharing grants and task/event tables are schema foundations only; no specialist agent is yet an independent running service.
+- Specialist tasks run only after an explicit owner action. Sensitive tasks additionally require recorded owner approval. Specialist models receive only their own working memories; restricted memories are excluded and cross-agent memory sharing is not yet enabled.
+- Specialist workers return text results only. They cannot call tools, send communications, publish, make purchases or control devices.
 - Voice, telephony, device control, emergency protocols and the virtual headquarters are not yet operational.
 - No paid service is activated automatically.
 

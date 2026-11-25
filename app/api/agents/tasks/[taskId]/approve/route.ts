@@ -31,7 +31,7 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
         .eq("id", taskId).eq("owner_id", owner.user.id);
       return fail("APPROVAL_AUDIT_FAILED", "Approval was rolled back because its audit event could not be recorded.", 503);
     }
-    return NextResponse.json({ task: data, executionEnabled: false, message: "Owner approval recorded. The task is queued but no agent has executed it." }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ task: data, executionEnabled: true, message: "Owner approval recorded. The task is queued; choose Run specialist when ready." }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return fail("APPROVAL_UNAVAILABLE", "Approval service is not configured.", 503);
   }
