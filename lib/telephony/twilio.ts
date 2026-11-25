@@ -1,4 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { deflateRawSync, inflateRawSync } from "node:zlib";
+import { decryptPrivateData, encryptPrivateData } from "@/lib/security/encryption";
 
 export type TwilioConfig = {
   accountSid: string;
@@ -70,6 +72,16 @@ export function validateTwilioSignature(
   const expectedBuffer = Buffer.from(expected, "utf8");
   const suppliedBuffer = Buffer.from(suppliedSignature, "utf8");
   return expectedBuffer.length === suppliedBuffer.length && timingSafeEqual(expectedBuffer, suppliedBuffer);
+}
+
+export function encodeCallState(value: string) {
+  const compressed = deflateRawSync(Buffer.from(value, "utf8")).toString("base64url");
+  return encryptPrivateData(compressed);
+}
+
+export function decodeCallState(token: string) {
+  const compressed = Buffer.from(decryptPrivateData(token), "base64url");
+  return inflateRawSync(compressed).toString("utf8");
 }
 
 export function escapeXml(value: string) {
