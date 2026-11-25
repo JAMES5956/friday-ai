@@ -8,7 +8,7 @@ The repository now contains:
 - Responsive public landing page and private owner workspace.
 - Supabase Auth integration with a server-enforced owner email allowlist.
 - Middleware protection for the private workspace and assistant API.
-- Supabase database schema with row-level security for profiles, conversations, messages, memories and security audit events.
+- Supabase database schema with row-level security for profiles, conversations, messages, memories, security audit events and isolated specialist-agent workspaces/tasks.
 - AES-256-GCM application-layer encryption for stored conversation and memory content.
 - OpenAI-compatible model-provider adapter, configurable through server-only environment variables.
 - FRIDAY system prompt and central conversation orchestrator.
@@ -36,7 +36,7 @@ Requirements: Node.js 20.9+ and npm.
 3. In Supabase Authentication, enable email/password sign-in and disable public sign-ups.
 4. Create the owner account manually in the Supabase dashboard.
 5. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `FRIDAY_OWNER_EMAIL`.
-6. Run both SQL migrations in order: `0001_friday_core.sql`, then `0002_nexus_rate_limits.sql`.
+6. Run the SQL migrations in order: `0001_friday_core.sql`, `0002_nexus_rate_limits.sql`, then `0003_agent_workspaces.sql`.
 7. Generate an application encryption key locally with `openssl rand -base64 32` and set `FRIDAY_DATA_ENCRYPTION_KEY`. Keep a secure offline backup of this key. Losing it makes encrypted stored data unrecoverable.
 8. Configure `AI_BASE_URL`, `AI_MODEL`, and `AI_API_KEY` only after choosing and approving a model provider. The API key is server-only and must never use a `NEXT_PUBLIC_` prefix.
 9. Install and run:
@@ -68,7 +68,7 @@ GitHub Actions runs the same checks for commits to `main` and `foundation/**` br
 - If the encryption key is missing or invalid, private storage endpoints fail closed.
 - The assistant route does not execute external actions. Sensitive or potentially irreversible requests are blocked until a separate approval workflow is implemented.
 - A model provider must be configured before FRIDAY can generate responses.
-- The agent registry is a design and orchestration foundation; specialist agents are not yet independent running services.
+- Specialist-agent workspaces, encrypted-memory storage, owner-controlled memory-sharing grants and task/event tables are schema foundations only; no specialist agent is yet an independent running service.
 - Voice, telephony, device control, emergency protocols and the virtual headquarters are not yet operational.
 - No paid service is activated automatically.
 
