@@ -14,6 +14,7 @@ type Department = {
 export default function HQClient({ departments }: { departments: Department[] }) {
   const [selected, setSelected] = useState(departments[0]?.id ?? "executive");
   const active = departments.find(department => department.id === selected) ?? departments[0];
+  if (!active) return null;
 
   return (
     <section className="hq-layout">
