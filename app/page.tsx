@@ -1,14 +1,11 @@
-"use client";
-
-import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
   AudioLines,
   BrainCircuit,
   ShieldCheck,
   Sparkles,
-  ArrowUpRight,
-  Mic
+  LockKeyhole,
+  ArrowUpRight
 } from "lucide-react";
 
 const capabilities = [
@@ -30,40 +27,6 @@ const capabilities = [
 ];
 
 export default function Home() {
-  const [message, setMessage] = useState("");
-  const [isSending, setIsSending] = useState(false);
-  const [serviceStatus, setServiceStatus] = useState("");
-
-  async function checkAssistant(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!message.trim() || isSending) return;
-
-    setIsSending(true);
-    setServiceStatus("");
-
-    try {
-      const response = await fetch("/api/assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message })
-      });
-      const result = (await response.json()) as {
-        error?: { message?: string };
-      };
-
-      setServiceStatus(
-        result.error?.message ??
-          (response.ok
-            ? "FRIDAY received the request."
-            : "FRIDAY could not process the request.")
-      );
-    } catch {
-      setServiceStatus("FRIDAY could not be reached. Check your connection.");
-    } finally {
-      setIsSending(false);
-    }
-  }
-
   return (
     <main className="shell">
       <div className="ambient ambient-one" />
@@ -74,7 +37,7 @@ export default function Home() {
           <span className="brand-mark"><Sparkles size={17} /></span>
           <span>FRIDAY<span className="brand-muted">.AI</span></span>
         </Link>
-        <div className="preview-status"><span /> FOUNDATION PREVIEW</div>
+        <Link className="owner-login-link" href="/login"><LockKeyhole size={13} /> OWNER SIGN IN</Link>
       </header>
 
       <section className="hero">
@@ -97,27 +60,10 @@ export default function Home() {
         </div>
 
         <div className="command-panel">
-          <div className="command-top"><span>COMMAND INTERFACE</span><span className="command-ready">API CONNECTION TEST</span></div>
-          <form className="command-input" onSubmit={checkAssistant}>
-            <Mic size={18} aria-hidden="true" />
-            <input
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              placeholder="Type a test message to check the assistant API..."
-              aria-label="Test message for FRIDAY"
-              maxLength={4000}
-              disabled={isSending}
-            />
-            <button type="submit" aria-label="Send test message" disabled={!message.trim() || isSending}>
-              <ArrowUpRight size={18} />
-            </button>
-          </form>
-          <p className="command-note" aria-live="polite">
-            {isSending
-              ? "Checking the FRIDAY API..."
-              : serviceStatus ||
-                "Text requests can reach the API boundary. AI responses are not enabled until authentication and a model provider are configured."}
-          </p>
+          <div className="command-top"><span>PRIVATE COMMAND INTERFACE</span><span className="command-ready">OWNER ACCESS</span></div>
+          <p className="public-command-copy">Your private workspace is protected by owner authentication.</p>
+          <Link className="enter-workspace-link" href="/login"><LockKeyhole size={16} /> Enter FRIDAY workspace <ArrowUpRight size={16} /></Link>
+          <p className="command-note">AI model, database and voice services activate only after secure configuration.</p>
         </div>
       </section>
 
