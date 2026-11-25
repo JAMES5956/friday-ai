@@ -76,7 +76,11 @@ export async function POST(request: Request) {
   }
   let payload: { content?: unknown; category?: unknown };
   try {
-    payload = JSON.parse(rawBody) as typeof payload;
+    const parsed: unknown = JSON.parse(rawBody);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return NextResponse.json({ error: "Send a JSON object." }, { status: 400 });
+    }
+    payload = parsed as typeof payload;
   } catch {
     return NextResponse.json({ error: "Send valid JSON." }, { status: 400 });
   }
@@ -95,7 +99,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Private memory encryption is not configured." }, { status: 503 });
   }
 
-  const supabase = await createClient();
+  const supabase = await getDatabaseClient();
+  if (!supabase) return NextResponse.json({ error: "Private database access is not configured." }, { status: 503 });
   const { data: withinLimit, error: limitError } = await supabase.rpc("consume_rate_limit", { p_limit: 20 });
   if (limitError) return NextResponse.json({ error: "NEXUS request protection is unavailable." }, { status: 503 });
   if (!withinLimit) return NextResponse.json({ error: "Too many memory changes. Try again in a minute." }, { status: 429 });
@@ -130,15 +135,20 @@ export async function DELETE(request: Request) {
   }
   let payload: { id?: unknown };
   try {
-    payload = JSON.parse(rawBody) as typeof payload;
+    const parsed: unknown = JSON.parse(rawBody);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return NextResponse.json({ error: "Send a JSON object." }, { status: 400 });
+    }
+    payload = parsed as typeof payload;
   } catch {
     return NextResponse.json({ error: "Send valid JSON." }, { status: 400 });
   }
-  if (typeof payload.id !== "string" || !/^[0-9a-f-]{36}$/i.test(payload.id)) {
+  if (typeof payload.id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.id)) {
     return NextResponse.json({ error: "A valid memory ID is required." }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  const supabase = await getDatabaseClient();
+  if (!supabase) return NextResponse.json({ error: "Private database access is not configured." }, { status: 503 });
   const { data: withinLimit, error: limitError } = await supabase.rpc("consume_rate_limit", { p_limit: 20 });
   if (limitError) return NextResponse.json({ error: "NEXUS request protection is unavailable." }, { status: 503 });
   if (!withinLimit) return NextResponse.json({ error: "Too many memory changes. Try again in a minute." }, { status: 429 });
