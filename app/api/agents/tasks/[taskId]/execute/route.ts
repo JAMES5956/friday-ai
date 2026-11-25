@@ -49,6 +49,25 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
         .map(row => decryptPrivateData(row.content_ciphertext));
     } catch { return fail("PRIVATE_DATA_UNREADABLE", "The specialist's private memory could not be decrypted.", 503); }
 
+    const { data: grantRows, error: grantError } = await supabase.from("agent_memory_grants")
+      .select("memory_id, from_agent_id, expires_at")
+      .eq("owner_id", owner.user.id).eq("to_agent_id", agent.id).is("revoked_at", null).limit(50);
+    if (grantError) return fail("MEMORY_GRANTS_UNAVAILABLE", "Approved cross-agent memory grants could not be loaded.", 503);
+    const activeGrants = (grantRows ?? []).filter(grant => !grant.expires_at || new Date(grant.expires_at).getTime() > Date.now());
+    if (activeGrants.length) {
+      const { data: sharedRows, error: sharedError } = await supabase.from("agent_memories")
+        .select("id, agent_id, content_ciphertext, sensitivity, expires_at")
+        .eq("owner_id", owner.user.id).in("id", activeGrants.map(grant => grant.memory_id));
+      if (sharedError) return fail("SHARED_MEMORY_UNAVAILABLE", "Owner-approved shared memory could not be loaded.", 503);
+      try {
+        for (const grant of activeGrants) {
+          const shared = (sharedRows ?? []).find(row => row.id === grant.memory_id && row.agent_id === grant.from_agent_id &&
+            row.sensitivity !== "restricted" && (!row.expires_at || new Date(row.expires_at).getTime() > Date.now()));
+          if (shared) memories.push("Owner-approved memory shared from " + grant.from_agent_id.toUpperCase() + ": " + decryptPrivateData(shared.content_ciphertext));
+        }
+      } catch { return fail("PRIVATE_DATA_UNREADABLE", "Approved shared memory could not be decrypted.", 503); }
+    }
+
     const { data: claimed, error: claimError } = await supabase.from("agent_tasks")
       .update({ status: "in_progress" }).eq("id", taskId).eq("owner_id", owner.user.id).in("status", ["queued", "failed"])
       .select("id").maybeSingle();
