@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getOwnerSession } from "@/lib/auth/owner";
-import { Sparkles, LogOut, Users, ShieldCheck } from "lucide-react";
+import { Sparkles, LogOut, Users, ShieldCheck, Building2 } from "lucide-react";
 import { signOut } from "@/app/workspace/sign-out";
 import WorkspaceClient from "@/app/workspace/workspace-client";
 import { specialistAgents } from "@/lib/agents/registry";
@@ -21,6 +22,7 @@ export default async function WorkspacePage() {
       <header className="workspace-topbar">
         <div className="auth-brand"><span className="brand-mark"><Sparkles size={17} /></span> FRIDAY<span className="brand-muted">.AI</span></div>
         <div className="workspace-owner">OWNER SESSION VERIFIED</div>
+        <Link className="signout-button" href="/company"><Building2 size={15} /> Company HQ</Link>
         <form action={signOut}><button className="signout-button" type="submit"><LogOut size={15} /> Sign out</button></form>
       </header>
       <section className="workspace-hero">
