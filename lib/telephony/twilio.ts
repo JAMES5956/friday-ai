@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { deflateRawSync, inflateRawSync } from "node:zlib";
-import { decryptPrivateData, encryptPrivateData } from "@/lib/security/encryption";
+import { decryptPrivateData, encryptPrivateData } from "../security/encryption";
 
 export type TwilioConfig = {
   accountSid: string;
