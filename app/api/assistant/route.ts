@@ -85,33 +85,43 @@ export async function POST(request: Request) {
     { p_limit: 15 }
   );
   if (rateLimitError) {
-    await supabase.from("security_audit_events").insert({
+    const { error: auditError } = await supabase.from("security_audit_events").insert({
       user_id: owner.user.id,
       event_type: "rate_limiter_unavailable",
       severity: "critical",
       details: { source: "assistant_api" }
     });
+    if (auditError) console.error("NEXUS could not record the rate-limiter failure event.");
     return fail("SECURITY_LIMITER_UNAVAILABLE", "NEXUS request protection is not configured. Apply the security migration.", 503);
   }
   if (!withinLimit) {
-    await supabase.from("security_audit_events").insert({
+    const { error: auditError } = await supabase.from("security_audit_events").insert({
       user_id: owner.user.id,
       event_type: "assistant_rate_limited",
       severity: "warning",
       details: { source: "assistant_api" }
     });
+    if (auditError) console.error("NEXUS could not record a rate-limit event.");
     return fail("RATE_LIMITED", "Too many requests. Wait a minute before trying again.", 429);
   }
 
   const nexusDecision = evaluateRequestForApproval(payload.message);
   if (!nexusDecision.allowed) {
-    // The block remains effective even if audit storage is temporarily unavailable.
-    await supabase.from("security_audit_events").insert({
+    // Never allow a sensitive request through because audit storage failed.
+    const { error: auditError } = await supabase.from("security_audit_events").insert({
       user_id: owner.user.id,
       event_type: "assistant_request_blocked",
       severity: "warning",
       details: { reason: nexusDecision.reason }
     });
+    if (auditError) {
+      console.error("NEXUS blocked a sensitive request but could not persist its audit event.");
+      return fail(
+        "NEXUS_AUDIT_UNAVAILABLE",
+        "This request remains blocked because its security event could not be recorded. Try again later.",
+        503
+      );
+    }
     return NextResponse.json(
       {
         error: {
