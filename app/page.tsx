@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
   AudioLines,
@@ -31,6 +31,38 @@ const capabilities = [
 
 export default function Home() {
   const [message, setMessage] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [serviceStatus, setServiceStatus] = useState("");
+
+  async function checkAssistant(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!message.trim() || isSending) return;
+
+    setIsSending(true);
+    setServiceStatus("");
+
+    try {
+      const response = await fetch("/api/assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message })
+      });
+      const result = (await response.json()) as {
+        error?: { message?: string };
+      };
+
+      setServiceStatus(
+        result.error?.message ??
+          (response.ok
+            ? "FRIDAY received the request."
+            : "FRIDAY could not process the request.")
+      );
+    } catch {
+      setServiceStatus("FRIDAY could not be reached. Check your connection.");
+    } finally {
+      setIsSending(false);
+    }
+  }
 
   return (
     <main className="shell">
@@ -65,20 +97,27 @@ export default function Home() {
         </div>
 
         <div className="command-panel">
-          <div className="command-top"><span>COMMAND INTERFACE</span><span className="command-ready">DESIGN PREVIEW</span></div>
-          <div className="command-input">
-            <Mic size={18} />
+          <div className="command-top"><span>COMMAND INTERFACE</span><span className="command-ready">API CONNECTION TEST</span></div>
+          <form className="command-input" onSubmit={checkAssistant}>
+            <Mic size={18} aria-hidden="true" />
             <input
               value={message}
               onChange={(event) => setMessage(event.target.value)}
-              placeholder="The voice interface will be connected in a later stage..."
-              aria-label="Command preview"
+              placeholder="Type a test message to check the assistant API..."
+              aria-label="Test message for FRIDAY"
+              maxLength={4000}
+              disabled={isSending}
             />
-            <button type="button" aria-label="Preview command" onClick={() => setMessage("")}>
+            <button type="submit" aria-label="Send test message" disabled={!message.trim() || isSending}>
               <ArrowUpRight size={18} />
             </button>
-          </div>
-          <p className="command-note">This is a visual foundation only. Voice recognition and AI responses are not connected yet.</p>
+          </form>
+          <p className="command-note" aria-live="polite">
+            {isSending
+              ? "Checking the FRIDAY API..."
+              : serviceStatus ||
+                "Text requests can reach the API boundary. AI responses are not enabled until authentication and a model provider are configured."}
+          </p>
         </div>
       </section>
 
