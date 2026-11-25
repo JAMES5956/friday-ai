@@ -4,6 +4,7 @@ import { getOwnerSession } from "@/lib/auth/owner";
 import { decryptPrivateData, encryptPrivateData } from "@/lib/security/encryption";
 import { specialistAgents } from "@/lib/agents/registry";
 import { executeAgentTask, resolveAgentModelConfig } from "@/lib/agents/runtime";
+import { isUnexpired } from "@/lib/agents/memory-sharing";
 
 export const dynamic = "force-dynamic";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -45,7 +46,7 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
     let memories: string[];
     try {
       const now = Date.now();
-      memories = (memoryRows ?? []).filter(row => row.sensitivity !== "restricted" && (!row.expires_at || new Date(row.expires_at).getTime() > now))
+      memories = (memoryRows ?? []).filter(row => row.sensitivity !== "restricted" && isUnexpired(row.expires_at, now))
         .map(row => decryptPrivateData(row.content_ciphertext));
     } catch { return fail("PRIVATE_DATA_UNREADABLE", "The specialist's private memory could not be decrypted.", 503); }
 
@@ -53,7 +54,7 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
       .select("memory_id, from_agent_id, expires_at")
       .eq("owner_id", owner.user.id).eq("to_agent_id", agent.id).is("revoked_at", null).limit(50);
     if (grantError) return fail("MEMORY_GRANTS_UNAVAILABLE", "Approved cross-agent memory grants could not be loaded.", 503);
-    const activeGrants = (grantRows ?? []).filter(grant => !grant.expires_at || new Date(grant.expires_at).getTime() > Date.now());
+    const activeGrants = (grantRows ?? []).filter(grant => isUnexpired(grant.expires_at));
     if (activeGrants.length) {
       const { data: sharedRows, error: sharedError } = await supabase.from("agent_memories")
         .select("id, agent_id, content_ciphertext, sensitivity, expires_at")
@@ -62,7 +63,7 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
       try {
         for (const grant of activeGrants) {
           const shared = (sharedRows ?? []).find(row => row.id === grant.memory_id && row.agent_id === grant.from_agent_id &&
-            row.sensitivity !== "restricted" && (!row.expires_at || new Date(row.expires_at).getTime() > Date.now()));
+            row.sensitivity !== "restricted" && isUnexpired(row.expires_at));
           if (shared) memories.push("Owner-approved memory shared from " + grant.from_agent_id.toUpperCase() + ": " + decryptPrivateData(shared.content_ciphertext));
         }
       } catch { return fail("PRIVATE_DATA_UNREADABLE", "Approved shared memory could not be decrypted.", 503); }

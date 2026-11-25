@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnerSession } from "@/lib/auth/owner";
 import { specialistAgents } from "@/lib/agents/registry";
+import { canShareMemory, isUnexpired } from "@/lib/agents/memory-sharing";
 
 export const dynamic = "force-dynamic";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -25,7 +26,7 @@ export async function GET(_request: Request, route: { params: Promise<{ agentId:
       .eq("owner_id", ctx.owner.user.id).eq("to_agent_id", ctx.agent.id).is("revoked_at", null)
       .order("approved_at", { ascending: false }).limit(100);
     if (error) return fail("MEMORY_GRANTS_UNAVAILABLE", "Could not load approved memory-sharing grants. Apply migration 0003.", 503);
-    return NextResponse.json({ grants: (data ?? []).filter(grant => !grant.expires_at || new Date(grant.expires_at).getTime() > Date.now()) }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ grants: (data ?? []).filter(grant => isUnexpired(grant.expires_at)) }, { headers: { "Cache-Control": "no-store" } });
   } catch { return fail("MEMORY_GRANTS_UNAVAILABLE", "Memory-sharing service is not configured.", 503); }
 }
 export async function POST(request: Request, route: { params: Promise<{ agentId: string }> }) {
@@ -47,15 +48,15 @@ export async function POST(request: Request, route: { params: Promise<{ agentId:
     const { data: memory, error: memoryError } = await ctx.supabase.from("agent_memories")
       .select("id, agent_id, sensitivity, expires_at").eq("id", input.memoryId).eq("owner_id", ctx.owner.user.id).maybeSingle();
     if (memoryError) return fail("AGENT_MEMORY_UNAVAILABLE", "Could not verify the source memory.", 503);
-    if (!memory || (memory.expires_at && new Date(memory.expires_at).getTime() <= Date.now())) return fail("MEMORY_NOT_FOUND", "Source memory was not found or has expired.", 404);
+    if (!memory || !isUnexpired(memory.expires_at)) return fail("MEMORY_NOT_FOUND", "Source memory was not found or has expired.", 404);
     if (memory.agent_id === ctx.agent.id) return fail("INVALID_MEMORY_GRANT", "A specialist cannot share memory with itself.", 400);
-    if (memory.sensitivity === "restricted") return fail("RESTRICTED_MEMORY", "Restricted memories cannot be shared with another agent.", 403);
+    if (!canShareMemory(memory.agent_id, ctx.agent.id, memory.sensitivity)) return fail("INVALID_MEMORY_GRANT", "This memory cannot be shared with the selected specialist.", 403);
     const { data: existing, error: existingError } = await ctx.supabase.from("agent_memory_grants")
       .select("id, expires_at, approved_at").eq("owner_id", ctx.owner.user.id).eq("memory_id", memory.id)
       .eq("from_agent_id", memory.agent_id).eq("to_agent_id", ctx.agent.id).is("revoked_at", null).maybeSingle();
     if (existingError) return fail("MEMORY_GRANTS_UNAVAILABLE", "Could not check existing sharing permission.", 503);
     const expiresAt = new Date(Date.now() + days * 86400000).toISOString();
-    if (existing && (!existing.expires_at || new Date(existing.expires_at).getTime() > Date.now())) {
+    if (existing && (isUnexpired(existing.expires_at))) {
       return NextResponse.json({ grant: existing, alreadyGranted: true }, { headers: { "Cache-Control": "no-store" } });
     }
     if (existing) {

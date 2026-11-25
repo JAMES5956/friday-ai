@@ -1,13 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { specialistAgents } from "../lib/agents/registry";
+import { canShareMemory, isUnexpired } from "../lib/agents/memory-sharing";
 
-function canShareMemory(fromAgentId: string, toAgentId: string, sensitivity: string) {
-  return specialistAgents.some(agent => agent.id === fromAgentId) &&
-    specialistAgents.some(agent => agent.id === toAgentId) &&
-    fromAgentId !== toAgentId && sensitivity !== "restricted";
-}
 describe("owner-controlled agent memory sharing", () => {
-  it("allows a non-restricted memory to be shared between registered agents", () => {
+  it("allows a non-restricted memory to be shared between registered specialists", () => {
     expect(canShareMemory("oracle", "forge", "internal")).toBe(true);
   });
   it("blocks restricted memories", () => {
@@ -18,5 +13,24 @@ describe("owner-controlled agent memory sharing", () => {
   });
   it("blocks unregistered agent IDs", () => {
     expect(canShareMemory("unknown", "forge", "routine")).toBe(false);
+  });
+  it("keeps FRIDAY and NEXUS outside ordinary specialist sharing", () => {
+    expect(canShareMemory("friday", "forge", "routine")).toBe(false);
+    expect(canShareMemory("oracle", "friday", "routine")).toBe(false);
+    expect(canShareMemory("nexus", "oracle", "routine")).toBe(false);
+    expect(canShareMemory("oracle", "nexus", "routine")).toBe(false);
+  });
+});
+
+describe("memory expiry", () => {
+  it("treats null expiry as permanent until deleted", () => {
+    expect(isUnexpired(null, 1000)).toBe(true);
+  });
+  it("rejects expired and malformed expiry timestamps", () => {
+    expect(isUnexpired("2026-01-01T00:00:00.000Z", Date.parse("2026-01-02T00:00:00.000Z"))).toBe(false);
+    expect(isUnexpired("not-a-date", 1000)).toBe(false);
+  });
+  it("accepts a future expiry", () => {
+    expect(isUnexpired("2026-01-02T00:00:00.000Z", Date.parse("2026-01-01T00:00:00.000Z"))).toBe(true);
   });
 });
