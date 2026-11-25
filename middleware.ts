@@ -11,6 +11,7 @@ export async function middleware(request: NextRequest) {
 
   const isProtected =
     request.nextUrl.pathname.startsWith("/workspace") ||
+    request.nextUrl.pathname.startsWith("/company") ||
     request.nextUrl.pathname.startsWith("/api/assistant");
 
   if (!isProtected) return NextResponse.next();
