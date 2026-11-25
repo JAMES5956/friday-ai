@@ -147,3 +147,8 @@ h1 span { color: var(--cyan); text-shadow: 0 0 35px rgba(112,228,244,.22); }
 .workspace-footer { display:flex;align-items:center;justify-content:center;gap:8px;margin:30px 0 10px; }
 @media(max-width:850px){.workspace-content{grid-template-columns:1fr}.workspace-hero{margin-top:40px}.workspace-memory{order:2}}
 @media(max-width:520px){.auth-card{padding:25px}.workspace-shell{padding:17px 13px}.workspace-owner{display:none}.workspace-chat,.workspace-memory,.agent-section{padding:14px}.service-pill{font-size:7px}.workspace-hero h1{font-size:44px}}
+
+.owner-login-link { display:flex;align-items:center;gap:7px;color:#9fc9d8;text-decoration:none;font:9px 'DM Mono',monospace;letter-spacing:.1em; }
+.public-command-copy { margin:14px 0;color:#9ab0bf;font-size:12px; }
+.enter-workspace-link { display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:12px;border:1px solid rgba(112,228,244,.3);border-radius:9px;background:linear-gradient(110deg,rgba(112,228,244,.12),rgba(76,143,255,.12));color:#bdf5ff;text-decoration:none;font-size:12px;font-weight:700; }
+.enter-workspace-link:hover,.owner-login-link:hover { color:#fff;border-color:rgba(112,228,244,.7); }
