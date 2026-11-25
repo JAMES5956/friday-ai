@@ -86,7 +86,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ task: data, executionEnabled: true, modelConfigured: Boolean(resolveAgentModelConfig(input.agentId as SpecialistAgentId)), message: decision.requiresApproval
       ? "Task saved and held for your approval. Approve it, then choose Run specialist when ready."
-      : resolveAgentModelConfig(input.agentId) ? "Task queued. Choose Run specialist when you are ready." : "Task queued. Configure this specialist’s dedicated model before running it." }, { status: 201, headers: { "Cache-Control": "no-store" } });
+      : resolveAgentModelConfig(input.agentId as SpecialistAgentId) ? "Task queued. Choose Run specialist when you are ready." : "Task queued. Configure this specialist’s dedicated model before running it." }, { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch {
     return fail("TASK_SERVICE_UNAVAILABLE", "Task services or encryption are not configured.", 503);
   }
