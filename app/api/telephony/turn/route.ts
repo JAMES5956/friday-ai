@@ -42,13 +42,15 @@ export async function POST(request: Request) {
   }
 
   const speech = (params.get("SpeechResult") ?? "").trim().slice(0, 700);
+  const encryptedState = new URL(request.url).searchParams.get("state");
   if (!speech) {
-    const action = escapeXml(buildPublicUrl(config, "/api/telephony/turn"));
+    const actionUrl = new URL(buildPublicUrl(config, "/api/telephony/turn"));
+    if (encryptedState) actionUrl.searchParams.set("state", encryptedState);
+    const action = escapeXml(actionUrl.toString());
     return twimlResponse(`<Gather input="speech" action="${action}" method="POST" speechTimeout="auto" language="${escapeXml(config.language)}" timeout="7"><Say voice="${escapeXml(config.voice)}" language="${escapeXml(config.language)}">Sorry, I didn't catch that. Please say that again.</Say></Gather><Say>Goodbye.</Say><Hangup/>`);
   }
 
   let state: CallState = { callSid: params.get("CallSid")!, turns: [], count: 0 };
-  const encryptedState = new URL(request.url).searchParams.get("state");
   if (encryptedState) {
     try {
       const parsed = JSON.parse(decodeCallState(encryptedState)) as CallState;
