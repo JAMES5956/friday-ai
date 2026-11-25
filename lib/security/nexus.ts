@@ -7,7 +7,7 @@ const sensitiveActions =
 
 const approvalPatterns = [
   new RegExp(`^\\s*(?:(?:please|kindly)\\s+)?${sensitiveActions}\\b`, "i"),
-  new RegExp(`\\b(?:please|kindly|could you|can you|would you|i want you to|i need you to|go ahead and|proceed to)\\s+${sensitiveActions}\\b`, "i")
+  new RegExp(`\\b(?:please|kindly|could you|can you|would you|i want you to|i need you to|go ahead and|proceed to)\\s+(?:(?:please|kindly)\\s+)?${sensitiveActions}\\b`, "i")
 ];
 
 export function evaluateRequestForApproval(message: string): SecurityDecision {
