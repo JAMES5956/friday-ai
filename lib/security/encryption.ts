@@ -6,8 +6,8 @@ function getEncryptionKey() {
   const encoded = process.env.FRIDAY_DATA_ENCRYPTION_KEY;
   if (!encoded) throw new Error("FRIDAY_DATA_ENCRYPTION_KEY is not configured.");
   const key = Buffer.from(encoded, "base64");
-  if (key.length !== 32) {
-    throw new Error("FRIDAY_DATA_ENCRYPTION_KEY must be a base64-encoded 32-byte key.");
+  if (key.length !== 32 || key.toString("base64") !== encoded) {
+    throw new Error("FRIDAY_DATA_ENCRYPTION_KEY must be a canonical base64-encoded 32-byte key.");
   }
   return key;
 }
@@ -29,7 +29,11 @@ export function decryptPrivateData(value: string) {
     throw new Error("Stored private data is not encrypted with a supported FRIDAY format.");
   }
   const key = getEncryptionKey();
-  const payload = Buffer.from(value.slice(PREFIX.length), "base64");
+  const encodedPayload = value.slice(PREFIX.length);
+  const payload = Buffer.from(encodedPayload, "base64");
+  if (payload.toString("base64") !== encodedPayload) {
+    throw new Error("Encrypted data has an invalid encoding.");
+  }
   if (payload.length < 29) throw new Error("Encrypted data is incomplete.");
   const iv = payload.subarray(0, 12);
   const tag = payload.subarray(12, 28);
