@@ -68,8 +68,15 @@ export async function POST(request: Request) {
   }
   if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
 
+  const supabase = await createClient();
   const nexusDecision = evaluateRequestForApproval(payload.message);
   if (!nexusDecision.allowed) {
+    await supabase.from("security_audit_events").insert({
+      user_id: owner.user.id,
+      event_type: "assistant_request_blocked",
+      severity: "warning",
+      details: { reason: nexusDecision.reason }
+    });
     return NextResponse.json(
       {
         error: {
@@ -88,15 +95,26 @@ export async function POST(request: Request) {
   } catch {
     return fail("PRIVATE_STORAGE_NOT_CONFIGURED", "Private storage is not configured with a valid encryption key.", 503);
   }
-  const supabase = await createClient();
   const { data: withinLimit, error: rateLimitError } = await supabase.rpc(
     "consume_rate_limit",
     { p_limit: 15 }
   );
   if (rateLimitError) {
+    await supabase.from("security_audit_events").insert({
+      user_id: owner.user.id,
+      event_type: "rate_limiter_unavailable",
+      severity: "critical",
+      details: { source: "assistant_api" }
+    });
     return fail("SECURITY_LIMITER_UNAVAILABLE", "NEXUS request protection is not configured. Apply the security migration.", 503);
   }
   if (!withinLimit) {
+    await supabase.from("security_audit_events").insert({
+      user_id: owner.user.id,
+      event_type: "assistant_rate_limited",
+      severity: "warning",
+      details: { source: "assistant_api" }
+    });
     return fail("RATE_LIMITED", "Too many requests. Wait a minute before trying again.", 429);
   }
 
