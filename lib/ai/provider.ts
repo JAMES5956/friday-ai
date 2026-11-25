@@ -21,7 +21,7 @@ function getChatCompletionsUrl(baseUrl: string) {
     : `${normalized}/v1/chat/completions`;
 }
 
-export async function generateAssistantReply(messages: ChatMessage[]) {
+export async function generateAssistantReply(messages: ChatMessage[], timeoutMs = 45_000) {
   const baseUrl = process.env.AI_BASE_URL;
   const apiKey = process.env.AI_API_KEY;
   const model = process.env.AI_MODEL;
@@ -55,7 +55,7 @@ export async function generateAssistantReply(messages: ChatMessage[]) {
         max_tokens: 1200
       }),
       cache: "no-store",
-      signal: AbortSignal.timeout(45_000)
+      signal: AbortSignal.timeout(Math.max(1_000, Math.min(timeoutMs, 45_000)))
     });
   } catch {
     return { ok: false as const, code: "AI_PROVIDER_UNREACHABLE" };
