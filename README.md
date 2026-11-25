@@ -53,6 +53,7 @@ Open http://localhost:3000.
 ```bash
 npm run lint
 npm run typecheck
+npm run test
 npm run build
 ```
 
@@ -79,7 +80,7 @@ GitHub Actions runs the same checks for commits to `main` and `foundation/**` br
 - [ ] Securely store and back up the encryption key; test encryption/decryption and recovery.
 - [ ] Select and approve the AI provider and its cost/retention terms.
 - [ ] Add request rate limiting, audit review and security tests.
-- [ ] Complete browser, mobile and accessibility testing.
+- [ ] Complete browser, mobile and accessibility testing, including device-specific voice support.
 - [ ] Complete independent security review.
 - [ ] Configure deployment secrets only after owner approval.
 
