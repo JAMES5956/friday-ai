@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     return fail("REQUEST_TOO_LARGE", "Request is too large.", 413);
   }
 
-  let payload: { message?: unknown; conversationId?: unknown };
+  let payload: { message?: unknown; conversationId?: unknown; includeMemory?: unknown };
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -55,6 +55,9 @@ export async function POST(request: Request) {
   if (payload.conversationId !== undefined &&
       (typeof payload.conversationId !== "string" || !UUID_PATTERN.test(payload.conversationId))) {
     return fail("INVALID_CONVERSATION", "Conversation identifier is invalid.", 400);
+  }
+  if (payload.includeMemory !== undefined && typeof payload.includeMemory !== "boolean") {
+    return fail("INVALID_MEMORY_OPTION", "includeMemory must be true or false.", 400);
   }
 
   let owner;
@@ -128,13 +131,26 @@ export async function POST(request: Request) {
   if (historyError) return fail("MEMORY_STORE_UNAVAILABLE", "Could not load conversation history.", 503);
 
   const userMessage = { role: "user" as const, content: payload.message.trim() };
+  let savedMemories: string[] = [];
+  if (payload.includeMemory === true) {
+    const { data: memoryRows, error: memoryError } = await supabase
+      .from("memories")
+      .select("content")
+      .eq("user_id", owner.user.id)
+      .eq("retained", true)
+      .order("updated_at", { ascending: false })
+      .limit(25);
+    if (memoryError) return fail("MEMORY_STORE_UNAVAILABLE", "Could not load saved memory.", 503);
+    savedMemories = (memoryRows ?? []).map(row => decryptPrivateData(row.content));
+  }
+
   const providerMessages = buildConversation([
     ...(history ?? []).map(item => ({
       role: item.role as "user" | "assistant",
       content: decryptPrivateData(item.content)
     })),
     userMessage
-  ]);
+  ], savedMemories);
 
   const generated = await generateAssistantReply(providerMessages);
   if (!generated.ok) {
