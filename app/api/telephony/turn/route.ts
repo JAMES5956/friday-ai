@@ -64,7 +64,7 @@ export async function POST(request: Request) {
 
   if (state.count >= 8) return xmlError("Thank you for calling. Please contact Victor again if you need further assistance. Goodbye.");
 
-  const turns: Turn[] = [...state.turns.slice(-5), { role: "user", content: speech }];
+  const turns: Turn[] = [...state.turns.slice(-5), { role: "user" as const, content: speech }];
   const generated = await generateAssistantReply([
     { role: "system", content: CALLER_SYSTEM_PROMPT },
     ...turns
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
   }
 
   const reply = generated.content.slice(0, 1000);
-  const nextTurns: Turn[] = [...turns, { role: "assistant", content: reply }].slice(-6);
+  const nextTurns: Turn[] = [...turns, { role: "assistant" as const, content: reply }].slice(-6);
   let token: string;
   try {
     token = encodeCallState(JSON.stringify({
