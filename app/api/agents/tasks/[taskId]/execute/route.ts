@@ -45,7 +45,7 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
     let memories: string[];
     try {
       const now = Date.now();
-      memories = (memoryRows ?? []).filter(row => !row.expires_at || new Date(row.expires_at).getTime() > now)
+      memories = (memoryRows ?? []).filter(row => row.sensitivity !== "restricted" && (!row.expires_at || new Date(row.expires_at).getTime() > now))
         .map(row => decryptPrivateData(row.content_ciphertext));
     } catch { return fail("PRIVATE_DATA_UNREADABLE", "The specialist's private memory could not be decrypted.", 503); }
 
@@ -77,7 +77,7 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
     const { error: completeError } = await supabase.from("agent_tasks").update({
       status: "completed", result_ciphertext: encryptPrivateData(result.content)
     }).eq("id", taskId).eq("owner_id", owner.user.id).eq("status", "in_progress");
-    if (completeError) return fail("TASK_RESULT_SAVE_FAILED", "The specialist replied, but its result could not be saved.", 503);
+    if (completeError) {\n      await supabase.from("agent_tasks").update({ status: "failed", result_ciphertext: null }).eq("id", taskId).eq("owner_id", owner.user.id).eq("status", "completed");\n      return fail("TASK_RESULT_SAVE_FAILED", "The specialist replied, but its result could not be saved.", 503);\n    }
 
     const { error: completeAuditError } = await supabase.from("agent_task_events").insert({
       owner_id: owner.user.id, task_id: taskId, actor_agent_id: agent.id, event_type: "task_completed",

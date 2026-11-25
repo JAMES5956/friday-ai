@@ -49,7 +49,7 @@ export async function POST(request: Request) {
   } catch { return fail("INVALID_JSON", "Send valid JSON.", 400); }
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return fail("INVALID_PAYLOAD", "Send a JSON object.", 400);
   const input = payload as { agentId?: unknown; title?: unknown; description?: unknown };
-  if (typeof input.agentId !== "string" || !specialistAgents.some(agent => agent.id === input.agentId)) return fail("INVALID_AGENT", "Choose a registered specialist.", 400);
+  if (typeof input.agentId !== "string" || !specialistAgents.some(agent => agent.id === input.agentId && agent.id !== "friday" && agent.id !== "nexus")) return fail("INVALID_AGENT", "Choose an executable registered specialist. FRIDAY and NEXUS cannot be assigned ordinary tasks.", 400);
   if (typeof input.title !== "string" || !input.title.trim() || input.title.trim().length > 160) return fail("INVALID_TITLE", "Task title must be 1–160 characters.", 400);
   if (typeof input.description !== "string" || !input.description.trim() || input.description.length > 10000) return fail("INVALID_DESCRIPTION", "Task description must be 1–10,000 characters.", 400);
 

@@ -66,7 +66,7 @@ export default function TaskCenter() {
   return <section className="task-center">
     <div className="workspace-section-heading"><div><ClipboardList /><div><h2>Delegation & task control</h2><p>Assign work, review approvals and track the queue</p></div></div><button className="icon-button" type="button" onClick={() => void loadTasks()} aria-label="Refresh tasks"><RefreshCw size={15} /></button></div>
     <form className="task-form" onSubmit={createTask}>
-      <label>Specialist<select value={agentId} onChange={event => setAgentId(event.target.value)}>{specialistAgents.filter(agent => agent.id !== "friday").map(agent => <option key={agent.id} value={agent.id}>{agent.name} — {agent.role}</option>)}</select></label>
+      <label>Specialist<select value={agentId} onChange={event => setAgentId(event.target.value)}>{specialistAgents.filter(agent => agent.id !== "friday" && agent.id !== "nexus").map(agent => <option key={agent.id} value={agent.id}>{agent.name} — {agent.role}</option>)}</select></label>
       <label>Task title<input value={title} onChange={event => setTitle(event.target.value)} maxLength={160} placeholder="e.g. Research a market opportunity" required /></label>
       <label>Task details<textarea value={description} onChange={event => setDescription(event.target.value)} maxLength={10000} rows={3} placeholder="Describe the work and expected outcome..." required /></label>
       <button type="submit" disabled={busy || !title.trim() || !description.trim()}><Send size={15} /> {busy ? "Saving..." : "Queue task"}</button>
