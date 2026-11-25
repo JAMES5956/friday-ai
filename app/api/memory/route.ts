@@ -73,6 +73,10 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createClient();
+  const { data: withinLimit, error: limitError } = await supabase.rpc("consume_rate_limit", { p_limit: 20 });
+  if (limitError) return NextResponse.json({ error: "NEXUS request protection is unavailable." }, { status: 503 });
+  if (!withinLimit) return NextResponse.json({ error: "Too many memory changes. Try again in a minute." }, { status: 429 });
+
   const { data, error } = await supabase
     .from("memories")
     .insert({ user_id: auth.user.id, category, content: encryptedContent, source: "owner" })
@@ -98,6 +102,10 @@ export async function DELETE(request: Request) {
   }
 
   const supabase = await createClient();
+  const { data: withinLimit, error: limitError } = await supabase.rpc("consume_rate_limit", { p_limit: 20 });
+  if (limitError) return NextResponse.json({ error: "NEXUS request protection is unavailable." }, { status: 503 });
+  if (!withinLimit) return NextResponse.json({ error: "Too many memory changes. Try again in a minute." }, { status: 429 });
+
   const { error } = await supabase
     .from("memories")
     .delete()
