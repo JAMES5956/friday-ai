@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   AudioLines,
   BrainCircuit,
@@ -37,10 +38,10 @@ export default function Home() {
       <div className="ambient ambient-two" />
 
       <header className="topbar">
-        <a className="brand" href="/" aria-label="FRIDAY AI home">
+        <Link className="brand" href="/" aria-label="FRIDAY AI home">
           <span className="brand-mark"><Sparkles size={17} /></span>
           <span>FRIDAY<span className="brand-muted">.AI</span></span>
-        </a>
+        </Link>
         <div className="preview-status"><span /> FOUNDATION PREVIEW</div>
       </header>
 
