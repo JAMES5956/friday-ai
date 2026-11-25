@@ -60,7 +60,7 @@ export default function WorkspaceClient() {
     }
     const recognition = new Recognition();
     recognitionRef.current = recognition;
-    recognition.lang = speechLanguage;
+    recognition.lang = speechLanguage === "sheng" ? "en-KE" : speechLanguage;
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
@@ -97,7 +97,7 @@ export default function WorkspaceClient() {
     stopRecognition();
     const recognition = new Recognition();
     recognitionRef.current = recognition;
-    recognition.lang = speechLanguage;
+    recognition.lang = speechLanguage === "sheng" ? "en-KE" : speechLanguage;
     recognition.continuous = true;
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
@@ -140,8 +140,9 @@ export default function WorkspaceClient() {
     }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = speechLanguage;
-    const languagePrefix = speechLanguage.split("-")[0].toLowerCase();
+    const voiceLocale = speechLanguage === "sheng" ? "en-KE" : speechLanguage;
+    utterance.lang = voiceLocale;
+    const languagePrefix = voiceLocale.split("-")[0].toLowerCase();
     const voices = window.speechSynthesis.getVoices();
     const preferredVoice = voices.find(voice => voice.lang.toLowerCase() === speechLanguage.toLowerCase())
       ?? voices.find(voice => voice.lang.toLowerCase().startsWith(languagePrefix));
