@@ -20,13 +20,15 @@ type SpeechWindow = Window & {
 };
 
 type ChatItem = { role: "user" | "assistant"; content: string };
-type ConversationItem = { id: string; title: string; updated_at: string };\ntype MemoryItem = { id: string; category: string; content: string; created_at: string };
+type ConversationItem = { id: string; title: string; updated_at: string };
+type MemoryItem = { id: string; category: string; content: string; created_at: string };
 type SecurityEvent = { id: string; event_type: string; severity: string; created_at: string };
 
 export default function WorkspaceClient() {
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [draft, setDraft] = useState("");
-  const [conversationId, setConversationId] = useState<string>();\n  const [conversations, setConversations] = useState<ConversationItem[]>([]);
+  const [conversationId, setConversationId] = useState<string>();
+  const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [includeMemory, setIncludeMemory] = useState(false);
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState("");
@@ -154,7 +156,8 @@ export default function WorkspaceClient() {
         return;
       }
       setConversationId(payload.conversationId);
-      setMessages(previous => [...previous, { role: "assistant", content: payload.reply }]);\n      void loadConversations();
+      setMessages(previous => [...previous, { role: "assistant", content: payload.reply }]);
+      void loadConversations();
     } catch {
       setStatus("The FRIDAY service could not be reached.");
     } finally {
@@ -216,7 +219,11 @@ export default function WorkspaceClient() {
           <div><BrainCircuit /><div><h2>Talk to FRIDAY</h2><p>Private owner conversation</p></div></div>
           <span className="service-pill">PROVIDER CONFIG REQUIRED</span>
         </div>
-        <div className="conversation-history" aria-label="Recent conversations">\n          <button type="button" className="new-conversation-button" onClick={startNewConversation}>+ New conversation</button>\n          {conversations.map(item => <button type="button" key={item.id} className={conversationId === item.id ? "conversation-item active" : "conversation-item"} onClick={() => void loadConversation(item.id)}>{item.title || "Private conversation"}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}\n        </div>\n        <div className="chat-transcript" aria-live="polite">
+        <div className="conversation-history" aria-label="Recent conversations">
+          <button type="button" className="new-conversation-button" onClick={startNewConversation}>+ New conversation</button>
+          {conversations.map(item => <button type="button" key={item.id} className={conversationId === item.id ? "conversation-item active" : "conversation-item"} onClick={() => void loadConversation(item.id)}>{item.title || "Private conversation"}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}
+        </div>
+        <div className="chat-transcript" aria-live="polite">
           {messages.length === 0 && (
             <div className="chat-empty">
               <Sparkles size={24} />
