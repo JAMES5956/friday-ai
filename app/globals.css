@@ -162,3 +162,14 @@ h1 span { color: var(--cyan); text-shadow: 0 0 35px rgba(112,228,244,.22); }
 .chat-composer button[type="button"] { flex:0 0 42px;height:42px;display:grid;place-items:center;border:1px solid rgba(112,228,244,.24);border-radius:10px;background:rgba(112,228,244,.08);color:#8ceaf4;cursor:pointer; }
 .speech-output-button { display:flex;align-items:center;gap:7px;margin-top:10px;padding:6px 0;border:0;background:transparent;color:#91b9c8;font-size:10px;cursor:pointer; }
 .voice-note { margin:5px 0;color:#657f8f;font-size:9px;line-height:1.5; }
+
+.nexus-audit-panel { max-width:1200px;margin:16px auto;padding:20px;border:1px solid var(--line);border-radius:15px;background:rgba(8,20,32,.72); }
+.nexus-event-list { display:grid;gap:8px;margin-top:16px; }
+.nexus-event { display:flex;align-items:center;gap:12px;padding:10px;border:1px solid rgba(111,190,220,.1);border-radius:8px;background:rgba(3,11,19,.35); }
+.nexus-event strong { color:#c9dce5;font-size:10px;font-weight:600;text-transform:capitalize; }
+.nexus-event time { margin-left:auto;color:#6f8b9b;font-size:9px; }
+.event-severity { min-width:58px;padding:4px 6px;border-radius:6px;text-align:center;font:8px 'DM Mono',monospace;text-transform:uppercase; }
+.event-severity.info { color:#86cde0;background:rgba(87,171,198,.12); }
+.event-severity.warning { color:#e1bd7e;background:rgba(225,189,126,.12); }
+.event-severity.critical { color:#ff9a9a;background:rgba(255,110,110,.12); }
+@media(max-width:520px){.nexus-audit-panel{padding:14px}.nexus-event{gap:7px;flex-wrap:wrap}.nexus-event time{width:100%;margin-left:65px}}
