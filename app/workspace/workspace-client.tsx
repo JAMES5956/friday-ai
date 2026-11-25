@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { BrainCircuit, Send, ShieldCheck, Sparkles, Plus, RefreshCw, Mic, Volume2 } from "lucide-react";
 
 type SpeechResultEvent = { results: ArrayLike<ArrayLike<{ transcript: string }>> };
@@ -8,6 +8,7 @@ type SpeechRecognitionLike = {
   lang: string;
   interimResults: boolean;
   maxAlternatives: number;
+  continuous: boolean;
   onresult: ((event: SpeechResultEvent) => void) | null;
   onerror: (() => void) | null;
   onend: (() => void) | null;
@@ -37,8 +38,20 @@ export default function WorkspaceClient() {
   const [memoryBusy, setMemoryBusy] = useState(false);
   const [securityEvents, setSecurityEvents] = useState<SecurityEvent[]>([]);
   const [listening, setListening] = useState(false);
+  const [wakeWordActive, setWakeWordActive] = useState(false);
+  const [speechLanguage, setSpeechLanguage] = useState("en-KE");
+  const [autoSpeak, setAutoSpeak] = useState(false);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+
+  function stopRecognition() {
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+    setListening(false);
+    setWakeWordActive(false);
+  }
 
   function startVoiceInput() {
+    stopRecognition();
     const speechWindow = window as SpeechWindow;
     const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
     if (!Recognition) {
@@ -46,41 +59,105 @@ export default function WorkspaceClient() {
       return;
     }
     const recognition = new Recognition();
-    recognition.lang = "en-KE";
+    recognitionRef.current = recognition;
+    recognition.lang = speechLanguage;
+    recognition.continuous = false;
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     recognition.onresult = event => {
-      const transcript = event.results[0]?.[0]?.transcript;
+      const transcript = event.results[event.results.length - 1]?.[0]?.transcript?.trim();
       if (transcript) setDraft(previous => previous ? previous + " " + transcript : transcript);
     };
     recognition.onerror = () => setStatus("Microphone input failed or permission was denied.");
-    recognition.onend = () => setListening(false);
+    recognition.onend = () => {
+      recognitionRef.current = null;
+      setListening(false);
+    };
     setListening(true);
-    try {
-      recognition.start();
-    } catch {
+    try { recognition.start(); }
+    catch {
+      recognitionRef.current = null;
       setListening(false);
       setStatus("Could not start microphone input.");
     }
   }
 
-  function speakLatestReply() {
-    const latestReply = [...messages].reverse().find(item => item.role === "assistant");
-    if (!latestReply || !("speechSynthesis" in window)) {
+  function toggleWakeWord() {
+    if (wakeWordActive) {
+      stopRecognition();
+      setStatus("Wake phrase listening stopped.");
+      return;
+    }
+    const speechWindow = window as SpeechWindow;
+    const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    if (!Recognition) {
+      setStatus("Wake phrase listening is not supported by this browser.");
+      return;
+    }
+    stopRecognition();
+    const recognition = new Recognition();
+    recognitionRef.current = recognition;
+    recognition.lang = speechLanguage;
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = event => {
+      const transcript = event.results[event.results.length - 1]?.[0]?.transcript?.trim() ?? "";
+      const match = transcript.match(/(?:hey\s+)?friday[,:;\s]*(.*)$/i);
+      if (!match) return;
+      const command = match[1].trim();
+      setDraft(command);
+      setStatus(command ? "Wake phrase detected. Review your message and send when ready." : "I'm listening, Boss. Say your request after the wake phrase.");
+      recognition.stop();
+    };
+    recognition.onerror = () => {
+      setStatus("Wake phrase listening stopped because microphone access failed.");
+      setWakeWordActive(false);
+      setListening(false);
+      recognitionRef.current = null;
+    };
+    recognition.onend = () => {
+      recognitionRef.current = null;
+      setWakeWordActive(false);
+      setListening(false);
+    };
+    setListening(true);
+    setWakeWordActive(true);
+    setStatus("Wake phrase listening is active while this tab remains open.");
+    try { recognition.start(); }
+    catch {
+      recognitionRef.current = null;
+      setListening(false);
+      setWakeWordActive(false);
+      setStatus("Could not start wake phrase listening.");
+    }
+  }
+
+  function speakText(text: string) {
+    if (!("speechSynthesis" in window)) {
       setStatus("Speech output is not available in this browser yet.");
       return;
     }
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(latestReply.content);
-    utterance.lang = "en-KE";
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = speechLanguage;
+    const languagePrefix = speechLanguage.split("-")[0].toLowerCase();
     const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(voice => voice.lang.toLowerCase() === "en-ke")
-      ?? voices.find(voice => voice.lang.toLowerCase().startsWith("en-gb"))
-      ?? voices.find(voice => voice.lang.toLowerCase().startsWith("en-us"));
+    const preferredVoice = voices.find(voice => voice.lang.toLowerCase() === speechLanguage.toLowerCase())
+      ?? voices.find(voice => voice.lang.toLowerCase().startsWith(languagePrefix));
     if (preferredVoice) utterance.voice = preferredVoice;
     utterance.rate = 1;
     utterance.pitch = 1.02;
     window.speechSynthesis.speak(utterance);
+  }
+
+  function speakLatestReply() {
+    const latestReply = [...messages].reverse().find(item => item.role === "assistant");
+    if (!latestReply) {
+      setStatus("There is no FRIDAY reply to speak yet.");
+      return;
+    }
+    speakText(latestReply.content);
   }
 
 
@@ -134,7 +211,7 @@ export default function WorkspaceClient() {
     }
   }
 
-  useEffect(() => { void loadMemories(); void loadSecurityEvents(); void loadConversations(true); }, []);
+  useEffect(() => { void loadMemories(); void loadSecurityEvents(); void loadConversations(true); return () => { recognitionRef.current?.stop(); window.speechSynthesis?.cancel(); }; }, []);
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -157,6 +234,7 @@ export default function WorkspaceClient() {
       }
       setConversationId(payload.conversationId);
       setMessages(previous => [...previous, { role: "assistant", content: payload.reply }]);
+      if (autoSpeak) speakText(payload.reply);
       void loadConversations();
     } catch {
       setStatus("The FRIDAY service could not be reached.");
@@ -248,8 +326,20 @@ export default function WorkspaceClient() {
           <button type="button" onClick={startVoiceInput} disabled={listening} aria-label="Speak to FRIDAY"><Mic size={17} /></button>
           <button type="submit" disabled={!draft.trim() || sending} aria-label="Send message"><Send size={17} /></button>
         </form>
-        <button type="button" className="speech-output-button" onClick={speakLatestReply}><Volume2 size={14} /> Speak latest FRIDAY reply</button>
-        <p className="voice-note">{listening ? "Listening for your message. Tap the microphone permission prompt if shown." : "Voice input is push-to-talk only. No background listening is enabled."}</p>
+        <div className="voice-controls">
+          <label>Speech language
+            <select value={speechLanguage} onChange={event => setSpeechLanguage(event.target.value)}>
+              <option value="en-KE">English (Kenya)</option>
+              <option value="sw-KE">Kiswahili (Kenya)</option>
+            </select>
+          </label>
+          <label className="auto-speak-toggle"><input type="checkbox" checked={autoSpeak} onChange={event => setAutoSpeak(event.target.checked)} /> Speak replies automatically</label>
+        </div>
+        <div className="voice-action-row">
+          <button type="button" className="speech-output-button" onClick={speakLatestReply}><Volume2 size={14} /> Speak latest reply</button>
+          <button type="button" className="wake-word-button" onClick={toggleWakeWord} disabled={listening && !wakeWordActive}>{wakeWordActive ? "Stop wake phrase" : "Enable wake phrase"}</button>
+        </div>
+        <p className="voice-note">{wakeWordActive ? "Wake phrase mode listens for “Hey Friday” or “Friday” while this tab is open. Stop it anytime." : listening ? "Listening for your message. Tap the microphone permission prompt if shown." : "Push-to-talk is available. Wake phrase mode is optional and requires this page to stay open."} Browser speech recognition may send audio to the browser speech service; background listening is not guaranteed.</p>
         {status && <p className="workspace-status" role="status">{status}</p>}
         <p className="workspace-disclaimer">No external actions are executed from this chat. Sensitive actions require a separate approval workflow.</p>
       </section>

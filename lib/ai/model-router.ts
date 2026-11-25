@@ -1,12 +1,12 @@
 import type { ChatMessage } from "./provider";
 export type ModelTier = "fast" | "default" | "reasoning";
-const REASONING_SIGNALS = /\b(analy[sz]e|analysis|reason|reasoning|compare|evaluate|design|architect|debug|diagnos|investigat|strategy|strategic|plan|step[- ]by[- ]step|trade[- ]offs|pros and cons|comprehensive|in depth|deep dive|calculate|derive|prove|review this code|audit)\b/i;
-const SIMPLE_SIGNALS = /^(hi|hello|hey|good morning|good afternoon|good evening|thanks|thank you|okay|ok|yes|no|good night|who are you|what is your name)[.!?\s]*$/i;
+const REASONING_SIGNALS = /\b(analy[sz]e|analysis|reason|reasoning|compare|evaluate|design|architect|debug|diagnos|investigat|strategy|strategic|plan|step[- ]by[- ]step|trade[- ]offs|pros and cons|comprehensive|in depth|deep dive|calculate|derive|prove|review this code|audit|chambua|linganisha|tathmini|hesabu|panga|tofautisha|eleza kwa kina)\b/i;
+const SIMPLE_SIGNALS = /^(hi|hello|hey|good morning|good afternoon|good evening|thanks|thank you|okay|ok|yes|no|good night|who are you|what is your name|habari|hujambo|asante|sawa|ndio|hapana|usiku mwema)[.!?\s]*$/i;
 export function selectModelTier(messages: ChatMessage[]): ModelTier {
  const latest = [...messages].reverse().find(message => message.role === "user")?.content.trim() ?? "";
  if (!latest) return "default";
  if (REASONING_SIGNALS.test(latest) || latest.length >= 1200) return "reasoning";
- if (SIMPLE_SIGNALS.test(latest) || latest.length <= 48) return "fast";
+ if (SIMPLE_SIGNALS.test(latest)) return "fast";
  return "default";
 }
 export function resolveModelForTier(tier: ModelTier, env: Record<string,string|undefined> = process.env): {model:string|undefined;configuredTier:ModelTier} {

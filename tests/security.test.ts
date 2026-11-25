@@ -94,6 +94,12 @@ describe("NEXUS approval gate", () => {
 });
 
 describe("FRIDAY conversation builder", () => {
+  it("instructs FRIDAY to support English, Kiswahili and Sheng naturally", () => {
+    const messages = buildConversation([{ role: "user", content: "Habari" }]);
+    expect(messages[0].content).toContain("Kiswahili");
+    expect(messages[0].content).toContain("Sheng");
+  });
+
   it("adds saved memories only when explicitly supplied", () => {
     const withoutMemory = buildConversation([{ role: "user", content: "Hello" }]);
     const withMemory = buildConversation(
