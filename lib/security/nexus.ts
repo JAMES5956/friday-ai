@@ -2,11 +2,13 @@ export type SecurityDecision =
   | { allowed: true; requiresApproval: false; reason: "routine_request" }
   | { allowed: false; requiresApproval: true; reason: "owner_approval_required" };
 
+const sensitiveActions =
+  "(?:send|publish|post|share|forward|email|message|call|pay|purchase|buy|subscribe|transfer|withdraw|donate|invest|delete|erase|wipe|reset|revoke|terminate|shutdown|change password|change permissions|grant access|export data)";
+
 const approvalPatterns = [
-  /\b(send|publish|post|share|forward|email|message|call)\b/i,
-  /\b(pay|purchase|buy|subscribe|transfer|withdraw|donate|invest)\b/i,
-  /\b(delete|erase|wipe|reset|revoke|terminate|shutdown)\b/i,
-  /\b(change password|change permissions|grant access|expose|export data)\b/i
+  new RegExp(`^\\s*(?:(?:please|kindly)\\s+)?${sensitiveActions}\\b`, "i"),
+  new RegExp(`\\b(?:please|kindly|could you|can you|would you|i want you to|go ahead and|proceed to)\\s+${sensitiveActions}\\b`, "i"),
+  /\b(?:send|publish|post|share|forward|email|message|call|pay|purchase|buy|subscribe|transfer|withdraw|donate|invest|delete|erase|wipe|reset|revoke|terminate|shutdown|grant|export)\s+(?:this|that|the|my|our|a|an)\b/i
 ];
 
 export function evaluateRequestForApproval(message: string): SecurityDecision {
