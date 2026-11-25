@@ -38,7 +38,7 @@ export default function TaskCenter() {
     finally { setBusy(false); }
   }
 
-  async function approveTask(taskId: string) {
+  async function runTask(taskId: string) {\n    if (busy) return;\n    setBusy(true); setStatus("");\n    try {\n      const response = await fetch(`/api/agents/tasks/${taskId}/execute`, { method: "POST" });\n      const payload = await response.json();\n      if (!response.ok) { setStatus(payload.error?.message ?? "Could not execute this task."); return; }\n      setStatus(payload.message ?? "Specialist task completed."); await loadTasks();\n    } catch { setStatus("Could not reach the specialist execution service."); }\n    finally { setBusy(false); }\n  }\n\n  async function approveTask(taskId: string) {
     if (busy) return;
     setBusy(true); setStatus("");
     try {
@@ -62,8 +62,8 @@ export default function TaskCenter() {
     {status && <p className="workspace-status" role="status">{status}</p>}
     <div className="task-list">{tasks.length === 0 ? <p className="memory-empty">No tasks yet. Create a task above to start the delegation queue.</p> : tasks.map(task => <article className="task-item" key={task.id}>
       <div className="task-item-top"><div><strong>{task.title}</strong><span>{agentName(task.assigned_agent_id)} · {new Date(task.created_at).toLocaleString()}</span></div><span className={`task-status ${task.status}`}>{task.status.replaceAll("_", " ")}</span></div>
-      <p>{task.description}</p>{task.status === "awaiting_approval" && <button type="button" disabled={busy} onClick={() => void approveTask(task.id)}><ShieldCheck size={15} /> Approve task</button>}
+      <p>{task.description}</p>{task.status === "queued" && <button type="button" disabled={busy} onClick={() => void runTask(task.id)}><Send size={15} /> Run specialist</button>}{task.status === "failed" && <button type="button" disabled={busy} onClick={() => void runTask(task.id)}>Retry specialist</button>}{task.status === "awaiting_approval" && <button type="button" disabled={busy} onClick={() => void approveTask(task.id)}><ShieldCheck size={15} /> Approve task</button>}
     </article>)}</div>
-    <p className="task-safety-note">Approval records your permission and queues the task. Specialist agents are not yet executing tasks; no external action is performed.</p>
+    <p className="task-safety-note">Running a queued task invokes only its assigned specialist model and private working memory. Specialists cannot execute external actions. Sensitive tasks remain blocked until you approve them.</p>
   </section>;
 }
