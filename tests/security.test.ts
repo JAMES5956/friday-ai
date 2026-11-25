@@ -40,6 +40,16 @@ describe("private data encryption", () => {
     expect(() => encryptPrivateData("private")).toThrow();
   });
 
+  it("rejects malformed base64 even when permissive decoding yields 32 bytes", () => {
+    process.env.FRIDAY_DATA_ENCRYPTION_KEY = "!" + Buffer.alloc(32, 7).toString("base64");
+    expect(() => encryptPrivateData("private")).toThrow(/canonical base64/);
+  });
+
+  it("rejects malformed base64 ciphertext before decryption", () => {
+    process.env.FRIDAY_DATA_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
+    expect(() => decryptPrivateData("friday:v1:!" + Buffer.alloc(32, 1).toString("base64"))).toThrow(/invalid encoding/);
+  });
+
   it("fails closed on legacy plaintext instead of silently returning it", () => {
     expect(() => decryptPrivateData("old unencrypted private text")).toThrow();
   });
