@@ -214,3 +214,16 @@ h1 span { color: var(--cyan); text-shadow: 0 0 35px rgba(112,228,244,.22); }
 .company-disclaimer { max-width:1100px;margin:18px auto;color:#718c9c;text-align:center;font:8px 'DM Mono',monospace;line-height:1.7;letter-spacing:.06em; }
 @media(max-width:760px){.hq-layout{grid-template-columns:1fr}.hq-tower{height:500px}.hq-floor{height:29px}.company-intro{margin-top:38px}}
 @media(max-width:420px){.hq-department-list{grid-template-columns:1fr}.hq-tower{height:480px}.hq-floor{width:78%}.hq-floor:nth-child(3n+1){width:84%}}
+
+
+.hq-agent-directory { display:grid;gap:7px;margin:16px 0;padding:13px;border:1px solid rgba(111,190,220,.12);border-radius:10px;background:rgba(3,11,19,.32); }
+.hq-agent-heading { display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;color:#d9edf5;font-size:11px; }
+.hq-agent-heading span { color:#7793a3;font:8px 'DM Mono',monospace; }
+.hq-agent-row { display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(111,190,220,.08); }
+.hq-agent-row div { display:grid;gap:3px; }
+.hq-agent-row strong { color:#d9edf5;font-size:10px; }
+.hq-agent-row div span { color:#7793a3;font-size:9px; }
+.hq-agent-status { flex-shrink:0;font:8px 'DM Mono',monospace;letter-spacing:.06em; }
+.hq-agent-status.foundation { color:#83d9e6; }
+.hq-agent-status.planned { color:#a2aab2; }
+.hq-agent-note { margin:5px 0 0;color:#7793a3;font-size:9px;line-height:1.6; }
