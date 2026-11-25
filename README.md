@@ -12,8 +12,8 @@ The repository now contains:
 - AES-256-GCM application-layer encryption for stored conversation and memory content.
 - OpenAI-compatible model-provider adapter, configurable through server-only environment variables.
 - FRIDAY system prompt and central conversation orchestrator.
-- Initial NEXUS request gate that blocks classes of sensitive external or irreversible requests until an approval workflow exists.
-- Specialist-agent registry and owner-controlled memory API.
+- NEXUS request gate plus an owner-controlled approval queue for sensitive delegated tasks.
+- Specialist-agent registry, owner-scoped encrypted task queue, explicit owner approval endpoint and workspace API. Task execution remains disabled.
 - Automated lint, TypeScript and production-build checks.
 
 This is a pre-deployment build. No public deployment has been performed. The application still requires private infrastructure configuration before authentication, database-backed memory and model responses can run.
@@ -36,7 +36,7 @@ Requirements: Node.js 20.9+ and npm.
 3. In Supabase Authentication, enable email/password sign-in and disable public sign-ups.
 4. Create the owner account manually in the Supabase dashboard.
 5. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `FRIDAY_OWNER_EMAIL`.
-6. Run the SQL migrations in order: `0001_friday_core.sql`, `0002_nexus_rate_limits.sql`, then `0003_agent_workspaces.sql`.
+6. Run the SQL migrations in order: `0001_friday_core.sql`, `0002_nexus_rate_limits.sql`, then `0003_agent_workspaces.sql`, then `0004_task_approval_workflow.sql`.
 7. Generate an application encryption key locally with `openssl rand -base64 32` and set `FRIDAY_DATA_ENCRYPTION_KEY`. Keep a secure offline backup of this key. Losing it makes encrypted stored data unrecoverable.
 8. Configure `AI_BASE_URL`, `AI_MODEL`, and `AI_API_KEY` only after choosing and approving a model provider. The API key is server-only and must never use a `NEXT_PUBLIC_` prefix.
 9. Install and run:
