@@ -80,8 +80,9 @@ export async function DELETE(request: Request, route: { params: Promise<{ agentI
   catch { return fail("INVALID_JSON", "Send a valid JSON object.", 400); }
   if (typeof payload.id !== "string" || !UUID.test(payload.id)) return fail("INVALID_MEMORY", "Memory identifier is invalid.", 400);
   try {
-    const { agent, owner, supabase } = await context((await route.params).agentId);
-    if (!agent || !owner || !supabase) return fail("INVALID_AGENT", "Choose a registered agent.", 400);
+    const ctx = await context((await route.params).agentId);
+    if ("response" in ctx) return ctx.response;
+    const { agent, owner, supabase } = ctx;
     const { data: allowed, error: rateError } = await supabase.rpc("consume_rate_limit", { p_limit: 30 });
     if (rateError) return fail("SECURITY_LIMITER_UNAVAILABLE", "NEXUS request protection is unavailable.", 503);
     if (!allowed) return fail("RATE_LIMITED", "Too many memory changes. Wait before trying again.", 429);

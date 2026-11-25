@@ -102,7 +102,7 @@ export default function AgentMemoryPanel() {
       <textarea value={draft} onChange={event => setDraft(event.target.value)} maxLength={10000} rows={3} placeholder={"Add a private note for " + agentName(agentId) + "..."} />
       <div className="agent-memory-controls">
         <label>Memory type<select value={memoryType} onChange={event => setMemoryType(event.target.value)}><option value="working">Working</option><option value="project">Project</option><option value="reference">Reference</option><option value="preference">Preference</option></select></label>
-        <label>Sensitivity<select value={sensitivity} onChange={event => setSensitivity(event.target.value)}><option value="routine">Routine</option><option value="internal">Internal</option><option value="restricted">Restricted (never shared)</option></select></label>
+        <label>Sensitivity<select value={sensitivity} onChange={event => setSensitivity(event.target.value)}><option value="routine">Routine</option><option value="internal">Internal</option><option value="restricted">Restricted (owner only; never passed to models)</option></select></label>
       </div>
       <button type="submit" disabled={busy || !draft.trim()}><Plus size={15} /> Save private memory</button>
     </form>

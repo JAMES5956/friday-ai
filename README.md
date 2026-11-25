@@ -38,11 +38,11 @@ Requirements: Node.js 20.9+ and npm.
 3. In Supabase Authentication, enable email/password sign-in and disable public sign-ups.
 4. Create the owner account manually in the Supabase dashboard.
 5. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `FRIDAY_OWNER_EMAIL`.
-6. Run the SQL migrations in order: `0001_friday_core.sql`, `0002_nexus_rate_limits.sql`, then `0003_agent_workspaces.sql`, then `0004_task_approval_workflow.sql`.
+6. Run the SQL migrations in order: `0001_friday_core.sql`, `0002_nexus_rate_limits.sql`, `0003_agent_workspaces.sql`, and `0004_task_approval_workflow.sql`.
 7. Generate an application encryption key locally with `openssl rand -base64 32` and set `FRIDAY_DATA_ENCRYPTION_KEY`. Keep a secure offline backup of this key. Losing it makes encrypted stored data unrecoverable.
 8. Configure `AI_BASE_URL`, `AI_MODEL`, and `AI_API_KEY` only after choosing and approving a model provider. The API key is server-only and must never use a `NEXT_PUBLIC_` prefix.
 9. To enable a specialist, also set its dedicated model variable (for example `AI_ORACLE_MODEL` or `AI_FORGE_MODEL`). Specialist execution deliberately has no fallback to `AI_MODEL`; each delegated agent must have its own configured model. All configured models use the shared server-side provider URL and key.
-10. Apply migrations `0003_agent_workspaces.sql` and `0004_task_approval_workflow.sql` before using delegation, approvals or specialist memory.
+
 11. Install and run:
 
 ```bash
@@ -70,7 +70,7 @@ GitHub Actions runs the same checks for commits to `main` and `foundation/**` br
 - Database tables use row-level security so authenticated users can only access rows belonging to their own auth user ID.
 - Conversation and memory content is encrypted before it is written to PostgreSQL. Keep the encryption key separate from the database and back it up securely.
 - If the encryption key is missing or invalid, private storage endpoints fail closed.
-- The assistant route does not execute external actions. Sensitive or potentially irreversible requests are blocked until a separate approval workflow is implemented.
+- The assistant route does not execute external actions. Sensitive or potentially irreversible delegated tasks remain blocked until the owner records approval in the task workflow.
 - A model provider must be configured before FRIDAY can generate responses.
 - Specialist tasks run only after an explicit owner action. Sensitive tasks additionally require recorded owner approval. Specialist models receive their own working memories plus only the non-restricted memories the owner explicitly shares with them. Sharing grants expire and can be revoked; restricted memories are never shared.
 - Specialist workers return text results only. They cannot call tools, send communications, publish, make purchases or control devices.
