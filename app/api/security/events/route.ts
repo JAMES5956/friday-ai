@@ -13,7 +13,13 @@ export async function GET() {
     return NextResponse.json({ error: "Owner authentication required." }, { status: 401 });
   }
 
-  const supabase = await createClient();
+  let supabase;
+  try {
+    supabase = await createClient();
+  } catch {
+    return NextResponse.json({ error: "Security audit storage is not configured." }, { status: 503 });
+  }
+
   const { data, error } = await supabase
     .from("security_audit_events")
     .select("id, event_type, severity, details, created_at")
