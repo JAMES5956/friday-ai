@@ -51,9 +51,23 @@ export async function POST(request: Request) {
   const auth = await requireOwner();
   if (auth.error || !auth.user) return auth.error;
 
+  if (!(request.headers.get("content-type") ?? "").toLowerCase().includes("application/json")) {
+    return NextResponse.json({ error: "Send application/json." }, { status: 415 });
+  }
+  const declaredLength = Number(request.headers.get("content-length") ?? 0);
+  if (declaredLength > 16_384) return NextResponse.json({ error: "Request is too large." }, { status: 413 });
+  let rawBody: string;
+  try {
+    rawBody = await request.text();
+  } catch {
+    return NextResponse.json({ error: "Could not read request body." }, { status: 400 });
+  }
+  if (new TextEncoder().encode(rawBody).byteLength > 16_384) {
+    return NextResponse.json({ error: "Request is too large." }, { status: 413 });
+  }
   let payload: { content?: unknown; category?: unknown };
   try {
-    payload = await request.json();
+    payload = JSON.parse(rawBody) as typeof payload;
   } catch {
     return NextResponse.json({ error: "Send valid JSON." }, { status: 400 });
   }
@@ -91,9 +105,23 @@ export async function DELETE(request: Request) {
   const auth = await requireOwner();
   if (auth.error || !auth.user) return auth.error;
 
+  if (!(request.headers.get("content-type") ?? "").toLowerCase().includes("application/json")) {
+    return NextResponse.json({ error: "Send application/json." }, { status: 415 });
+  }
+  const declaredLength = Number(request.headers.get("content-length") ?? 0);
+  if (declaredLength > 1_024) return NextResponse.json({ error: "Request is too large." }, { status: 413 });
+  let rawBody: string;
+  try {
+    rawBody = await request.text();
+  } catch {
+    return NextResponse.json({ error: "Could not read request body." }, { status: 400 });
+  }
+  if (new TextEncoder().encode(rawBody).byteLength > 1_024) {
+    return NextResponse.json({ error: "Request is too large." }, { status: 413 });
+  }
   let payload: { id?: unknown };
   try {
-    payload = await request.json();
+    payload = JSON.parse(rawBody) as typeof payload;
   } catch {
     return NextResponse.json({ error: "Send valid JSON." }, { status: 400 });
   }
