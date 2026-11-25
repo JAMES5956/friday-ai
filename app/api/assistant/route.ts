@@ -4,6 +4,7 @@ import { getOwnerSession } from "@/lib/auth/owner";
 import { generateAssistantReply } from "@/lib/ai/provider";
 import { buildConversation } from "@/lib/ai/orchestrator";
 import { evaluateRequestForApproval } from "@/lib/security/nexus";
+import { decryptPrivateData, encryptPrivateData } from "@/lib/security/encryption";
 
 const MAX_BODY_BYTES = 16_384;
 const MAX_MESSAGE_LENGTH = 4_000;
@@ -78,7 +79,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = await createClient();
+  let supabase;
+  try {
+    // Fail closed if the private-data encryption key is missing or invalid.
+    encryptPrivateData("configuration-check");
+    supabase = await createClient();
+  } catch {
+    return fail("PRIVATE_STORAGE_NOT_CONFIGURED", "Private storage is not configured with a valid encryption key and database.", 503);
+  }
   let conversationId = payload.conversationId as string | undefined;
 
   if (conversationId) {
@@ -113,7 +121,7 @@ export async function POST(request: Request) {
   const providerMessages = buildConversation([
     ...(history ?? []).map(item => ({
       role: item.role as "user" | "assistant",
-      content: item.content
+      content: decryptPrivateData(item.content)
     })),
     userMessage
   ]);
@@ -130,7 +138,7 @@ export async function POST(request: Request) {
     conversation_id: conversationId,
     user_id: owner.user.id,
     role: "user",
-    content: userMessage.content
+    content: encryptPrivateData(userMessage.content)
   });
   if (saveUserError) return fail("MEMORY_STORE_UNAVAILABLE", "Could not save your message.", 503);
 
@@ -138,7 +146,7 @@ export async function POST(request: Request) {
     conversation_id: conversationId,
     user_id: owner.user.id,
     role: "assistant",
-    content: generated.content
+    content: encryptPrivateData(generated.content)
   });
   if (saveAssistantError) return fail("MEMORY_STORE_UNAVAILABLE", "The reply was generated but could not be saved.", 503);
 
