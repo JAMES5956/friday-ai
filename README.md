@@ -14,7 +14,8 @@ The repository now contains:
 - FRIDAY system prompt and central conversation orchestrator.
 - NEXUS request gate plus an owner-controlled approval queue for sensitive delegated tasks.
 - Central specialist recommendation and explicit owner-controlled task handoff.
-- Owner-triggered specialist execution through dedicated per-agent model configuration, encrypted task results, task-event auditing and isolated private working memory. Specialists have no external-action tools; sensitive tasks require owner approval before execution.
+- Owner-triggered specialist execution through dedicated per-agent model configuration, encrypted task results, task-event auditing and isolated private working memory.
+- Owner-controlled specialist memory management, expiring cross-agent sharing grants, revocation, and restricted-memory exclusion.
 - Automated lint, TypeScript and production-build checks.
 
 This is a pre-deployment build. No public deployment has been performed. The application still requires private infrastructure configuration before authentication, database-backed memory and model responses can run.
@@ -71,7 +72,7 @@ GitHub Actions runs the same checks for commits to `main` and `foundation/**` br
 - If the encryption key is missing or invalid, private storage endpoints fail closed.
 - The assistant route does not execute external actions. Sensitive or potentially irreversible requests are blocked until a separate approval workflow is implemented.
 - A model provider must be configured before FRIDAY can generate responses.
-- Specialist tasks run only after an explicit owner action. Sensitive tasks additionally require recorded owner approval. Specialist models receive only their own working memories; restricted memories are excluded and cross-agent memory sharing is not yet enabled.
+- Specialist tasks run only after an explicit owner action. Sensitive tasks additionally require recorded owner approval. Specialist models receive their own working memories plus only the non-restricted memories the owner explicitly shares with them. Sharing grants expire and can be revoked; restricted memories are never shared.
 - Specialist workers return text results only. They cannot call tools, send communications, publish, make purchases or control devices.
 - Voice, telephony, device control, emergency protocols and the virtual headquarters are not yet operational.
 - No paid service is activated automatically.

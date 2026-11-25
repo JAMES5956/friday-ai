@@ -25,7 +25,7 @@ export async function GET(_request: Request, route: { params: Promise<{ agentId:
       .eq("owner_id", ctx.owner.user.id).eq("to_agent_id", ctx.agent.id).is("revoked_at", null)
       .order("approved_at", { ascending: false }).limit(100);
     if (error) return fail("MEMORY_GRANTS_UNAVAILABLE", "Could not load approved memory-sharing grants. Apply migration 0003.", 503);
-    return NextResponse.json({ grants: data ?? [] }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ grants: (data ?? []).filter(grant => !grant.expires_at || new Date(grant.expires_at).getTime() > Date.now()) }, { headers: { "Cache-Control": "no-store" } });
   } catch { return fail("MEMORY_GRANTS_UNAVAILABLE", "Memory-sharing service is not configured.", 503); }
 }
 export async function POST(request: Request, route: { params: Promise<{ agentId: string }> }) {
@@ -80,6 +80,9 @@ export async function DELETE(request: Request, route: { params: Promise<{ agentI
   try {
     const ctx = await context((await route.params).agentId);
     if ("response" in ctx) return ctx.response;
+    const { data: allowed, error: rateError } = await ctx.supabase.rpc("consume_rate_limit", { p_limit: 20 });
+    if (rateError) return fail("SECURITY_LIMITER_UNAVAILABLE", "NEXUS request protection is unavailable.", 503);
+    if (!allowed) return fail("RATE_LIMITED", "Too many sharing changes. Wait before trying again.", 429);
     const { data, error } = await ctx.supabase.from("agent_memory_grants").update({ revoked_at: new Date().toISOString() })
       .eq("id", payload.grantId).eq("owner_id", ctx.owner.user.id).eq("to_agent_id", ctx.agent.id)
       .is("revoked_at", null).select("id, from_agent_id").maybeSingle();

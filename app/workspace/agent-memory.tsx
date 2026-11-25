@@ -38,6 +38,7 @@ export default function AgentMemoryPanel() {
   }, [recipientId]);
 
   useEffect(() => { void loadMemories(); }, [loadMemories]);
+  useEffect(() => { if (recipientId === agentId) { const next = agents.find(agent => agent.id !== agentId); if (next) setRecipientId(next.id); } }, [agentId, recipientId]);
   useEffect(() => { void loadGrants(); }, [loadGrants]);
 
   async function saveMemory(event: React.FormEvent<HTMLFormElement>) {

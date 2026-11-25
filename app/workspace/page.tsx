@@ -38,7 +38,7 @@ export default async function WorkspacePage() {
       <section className="agent-section">
         <div className="workspace-section-heading"><div><Users /><div><h2>Specialist network</h2><p>Central orchestration with dedicated domains</p></div></div></div>
         <div className="agent-grid">
-          {specialistAgents.map(agent => <article className="agent-card" key={agent.id}><strong>{agent.name}</strong><span>{agent.role}</span><small>{agent.status === "foundation" ? "SECURITY FOUNDATION" : "PLANNED"}</small></article>)}
+          {specialistAgents.map(agent => <article className="agent-card" key={agent.id}><strong>{agent.name}</strong><span>{agent.role}</span><small>{agent.status === "foundation" ? "SECURITY FOUNDATION" : "OWNER-TRIGGERED SPECIALIST"}</small></article>)}
         </div>
       </section>
       <footer className="workspace-footer"><ShieldCheck size={14} /> NEXUS SECURITY FOUNDATION · OWNER-ONLY ACCESS · PRE-DEPLOYMENT</footer>
