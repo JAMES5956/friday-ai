@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getOwnerSession } from "@/lib/auth/owner";
 import { Sparkles } from "lucide-react";
 import { departments } from "@/lib/company/departments";
+import { specialistAgents } from "@/lib/agents/registry";
 import HQClient from "@/app/company/hq-client";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ export default async function CompanyPage() {
         <h1>Welcome to the company,<br /><span>Boss.</span></h1>
         <p>Explore the planned FRIDAY AI Corporation headquarters and its specialist departments.</p>
       </section>
-      <HQClient departments={[...departments]} />
+      <HQClient departments={[...departments]} agents={[...specialistAgents]} />
       <p className="company-disclaimer">VIRTUAL HQ PREVIEW · Departments and agent roles are architectural placeholders. Live agent sessions, meetings, 3D navigation and manufacturing integrations are not connected yet.</p>
     </main>
   );
