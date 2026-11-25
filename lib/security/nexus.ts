@@ -3,7 +3,7 @@ export type SecurityDecision =
   | { allowed: false; requiresApproval: true; reason: "owner_approval_required" };
 
 const sensitiveActions =
-  "(?:send(?:ing)?|publish(?:ing)?|post(?:ing)?|share|sharing|forward(?:ing)?|email|message|call|pay(?:ing)?|purchase|buy(?:ing)?|subscribe|transfer|withdraw|donate|invest|delete|deleting|erase|erasing|wipe|reset|revoke|terminate|shutdown|change password|change permissions|grant access|export data)";
+  "(?:send(?:ing)?|publish(?:ing)?|post(?:ing)?|share|sharing|forward(?:ing)?|email|message|call|book|booking|schedule|scheduling|invite|inviting|submit|submitting|upload|uploading|pay(?:ing)?|purchase|buy(?:ing)?|order|ordering|subscribe|transfer|withdraw|donate|invest|delete|deleting|erase|erasing|wipe|reset|revoke|cancel|cancelling|terminate|shutdown|change password|change permissions|grant access|export data)";
 
 const approvalPatterns = [
   new RegExp(`^\\s*(?:(?:please|kindly)\\s+)?${sensitiveActions}\\b`, "i"),
