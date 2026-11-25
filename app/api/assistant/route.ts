@@ -5,6 +5,7 @@ import { generateAssistantReply } from "@/lib/ai/provider";
 import { buildConversation } from "@/lib/ai/orchestrator";
 import { evaluateRequestForApproval } from "@/lib/security/nexus";
 import { decryptPrivateData, encryptPrivateData } from "@/lib/security/encryption";
+import { recommendSpecialist } from "@/lib/agents/router";
 
 const MAX_BODY_BYTES = 16_384;
 const MAX_MESSAGE_LENGTH = 4_000;
@@ -313,7 +314,7 @@ export async function POST(request: Request) {
   if (timestampError) console.error("FRIDAY could not refresh the conversation timestamp.");
 
   return NextResponse.json(
-    { conversationId, reply: generated.content, modelTier: generated.modelTier },
+    { conversationId, reply: generated.content, modelTier: generated.modelTier, specialistRecommendation: recommendSpecialist(userMessage.content) },
     { headers: { "Cache-Control": "no-store" } }
   );
 }

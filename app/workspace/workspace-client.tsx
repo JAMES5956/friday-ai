@@ -24,6 +24,7 @@ type ChatItem = { role: "user" | "assistant"; content: string };
 type ConversationItem = { id: string; title: string; updated_at: string };
 type MemoryItem = { id: string; category: string; content: string; created_at: string };
 type SecurityEvent = { id: string; event_type: string; severity: string; created_at: string };
+type SpecialistRecommendation = { agentId: string; name: string; role: string; confidence: "high" | "moderate"; reason: string };
 
 export default function WorkspaceClient() {
   const [messages, setMessages] = useState<ChatItem[]>([]);
@@ -43,6 +44,9 @@ export default function WorkspaceClient() {
   const [autoSpeak, setAutoSpeak] = useState(false);
   const [providerConfigured, setProviderConfigured] = useState(false);
   const [modelTier, setModelTier] = useState<string>();
+  const [specialistRecommendation, setSpecialistRecommendation] = useState<SpecialistRecommendation | null>(null);
+  const [lastUserRequest, setLastUserRequest] = useState("");
+  const [handoffBusy, setHandoffBusy] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   function stopRecognition() {
@@ -255,6 +259,8 @@ export default function WorkspaceClient() {
       }
       setConversationId(payload.conversationId);
       setModelTier(payload.modelTier);
+      setSpecialistRecommendation(payload.specialistRecommendation ?? null);
+      setLastUserRequest(content);
       setMessages(previous => [...previous, { role: "assistant", content: payload.reply }]);
       if (autoSpeak) speakText(payload.reply);
       void loadConversations();
@@ -263,6 +269,19 @@ export default function WorkspaceClient() {
     } finally {
       setSending(false);
     }
+  }
+
+  async function handoffToSpecialist() {
+    if (!specialistRecommendation || !lastUserRequest || handoffBusy) return;
+    setHandoffBusy(true); setStatus("");
+    try {
+      const response = await fetch("/api/agents/tasks", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId: specialistRecommendation.agentId, title: `Assist with: ${lastUserRequest.slice(0, 135)}`, description: lastUserRequest }) });
+      const payload = await response.json();
+      if (!response.ok) { setStatus(payload.error?.message ?? "Could not prepare the specialist handoff."); return; }
+      setStatus(payload.message ?? "Task saved. Specialist execution is not enabled yet.");
+    } catch { setStatus("Could not reach the specialist task service."); }
+    finally { setHandoffBusy(false); }
   }
 
   async function deleteMemory(id: string) {
@@ -364,6 +383,12 @@ export default function WorkspaceClient() {
         </div>
         <p className="voice-note">{wakeWordActive ? "Wake phrase mode listens for “Hey Friday” or “Friday” while this tab is open. Stop it anytime." : listening ? "Listening for your message. Tap the microphone permission prompt if shown." : "Push-to-talk is available. Wake phrase mode is optional and requires this page to stay open."} Browser speech recognition may send audio to the browser speech service; background listening is not guaranteed.</p>
         {modelTier && <p className="voice-note">Last response model tier: {modelTier}.</p>}
+        {specialistRecommendation && <div className="specialist-recommendation">
+          <p><strong>Suggested specialist: {specialistRecommendation.name}</strong> · {specialistRecommendation.role} ({specialistRecommendation.confidence} confidence)</p>
+          <p>{specialistRecommendation.reason} FRIDAY remains in control; this is only a recommendation.</p>
+          <button type="button" onClick={() => void handoffToSpecialist()} disabled={handoffBusy}>{handoffBusy ? "Saving task..." : `Prepare task for ${specialistRecommendation.name}`}</button>
+          <small>Nothing runs automatically. This saves a task for review; specialist execution is not enabled.</small>
+        </div>}
         {status && <p className="workspace-status" role="status">{status}</p>}
         <p className="workspace-disclaimer">No external actions are executed from this chat. Sensitive actions require a separate approval workflow.</p>
       </section>
