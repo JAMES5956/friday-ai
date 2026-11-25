@@ -14,7 +14,7 @@ The current branch contains a private workspace foundation, Supabase authenticat
 - **NEXUS policy boundary:** deterministic approval gate for sensitive or irreversible request categories. This is an initial guard, not a complete independent security agent.
 - **Memory service:** PostgreSQL tables for conversations, messages and memories, protected by row-level security.
 - **Data encryption:** AES-256-GCM application-layer encryption for stored conversation and memory content. Encryption key is independent of the database.
-- **Specialist agents:** explicit registry of domains and planned roles. Migration `0003_agent_workspaces.sql` adds owner-scoped workspaces, per-agent encrypted-memory storage, explicit owner-managed memory-sharing grants, task queues and append-only task events. These are storage foundations only: agents do not yet execute independently, have separate model credentials, or access these tables through runtime services.
+- **Specialist agents:** explicit registry of domains and planned roles. Migrations `0003_agent_workspaces.sql` and `0004_task_approval_workflow.sql` add owner-scoped workspaces, per-agent encrypted-memory storage, explicit owner-managed memory-sharing grants, encrypted task queues, append-only task events and an explicit owner-approval state. Owner APIs can create and inspect tasks; sensitive tasks are held in `awaiting_approval` until the owner approves them. Approval only moves a task into the queue. Specialist execution remains disabled: agents do not yet execute independently, have separate model credentials, or access these tables through runtime services.
 
 ## Identity and permissions
 
@@ -38,7 +38,7 @@ The current branch contains a private workspace foundation, Supabase authenticat
 
 ## Current sensitive-action boundary
 
-NEXUS currently blocks a conservative set of requests associated with messaging, publishing, financial transactions, deletion, permission changes and other high-impact actions. This is not a substitute for a contextual approval workflow, tool-level permissions or a dedicated security model. The chat route has no external action tools attached.
+NEXUS currently blocks a conservative set of requests associated with messaging, publishing, financial transactions, deletion, permission changes and other high-impact actions. Sensitive delegated tasks can be held in an owner-approval queue; the approval record is audited and does not itself execute an action. This is not a substitute for contextual intent analysis, tool-level permissions or a dedicated security model. The chat route has no external action tools attached.
 
 ## Specialist-agent data boundaries
 
