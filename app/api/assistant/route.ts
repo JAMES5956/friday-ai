@@ -79,14 +79,13 @@ export async function POST(request: Request) {
     );
   }
 
-  let supabase;
   try {
     // Fail closed if the private-data encryption key is missing or invalid.
     encryptPrivateData("configuration-check");
-    supabase = await createClient();
   } catch {
-    return fail("PRIVATE_STORAGE_NOT_CONFIGURED", "Private storage is not configured with a valid encryption key and database.", 503);
+    return fail("PRIVATE_STORAGE_NOT_CONFIGURED", "Private storage is not configured with a valid encryption key.", 503);
   }
+  const supabase = await createClient();
   let conversationId = payload.conversationId as string | undefined;
 
   if (conversationId) {
