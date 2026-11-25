@@ -14,7 +14,7 @@ The current branch contains a private workspace foundation, Supabase authenticat
 - **NEXUS policy boundary:** deterministic approval gate for sensitive or irreversible request categories. This is an initial guard, not a complete independent security agent.
 - **Memory service:** PostgreSQL tables for conversations, messages and memories, protected by row-level security.
 - **Data encryption:** AES-256-GCM application-layer encryption for stored conversation and memory content. Encryption key is independent of the database.
-- **Specialist agents:** explicit registry of domains and planned roles. Registry entries are not running agents.
+- **Specialist agents:** explicit registry of domains and planned roles. Migration `0003_agent_workspaces.sql` adds owner-scoped workspaces, per-agent encrypted-memory storage, explicit owner-managed memory-sharing grants, task queues and append-only task events. These are storage foundations only: agents do not yet execute independently, have separate model credentials, or access these tables through runtime services.
 
 ## Identity and permissions
 
@@ -39,6 +39,15 @@ The current branch contains a private workspace foundation, Supabase authenticat
 ## Current sensitive-action boundary
 
 NEXUS currently blocks a conservative set of requests associated with messaging, publishing, financial transactions, deletion, permission changes and other high-impact actions. This is not a substitute for a contextual approval workflow, tool-level permissions or a dedicated security model. The chat route has no external action tools attached.
+
+## Specialist-agent data boundaries
+
+1. Each specialist has a distinct `agent_id` namespace and owner-scoped workspace.
+2. Agent memory, task payloads, results and task-event details are stored as ciphertext; application code must encrypt/decrypt them using the existing encryption service before any database write/read.
+3. A specialist must not read another specialist's memory by default. Cross-agent handoff requires an explicit owner-managed row in `agent_memory_grants`, with source agent, recipient agent, expiry and revocation fields.
+4. Task records identify the assigned specialist and creator. Task events are append-only for authenticated clients.
+5. These tables do not grant model/API access or enable autonomous execution. Runtime services must enforce agent identity, allowed tools, task scope, approval gates and audit logging before agents are activated.
+6. Do not put provider API keys, OAuth tokens or other secrets in agent tables; keep them in server-side secret storage.
 
 ## Deployment gate
 
