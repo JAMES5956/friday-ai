@@ -40,7 +40,7 @@ export default function WorkspaceClient() {
   const [listening, setListening] = useState(false);
   const [wakeWordActive, setWakeWordActive] = useState(false);
   const [speechLanguage, setSpeechLanguage] = useState("en-KE");
-  const [autoSpeak, setAutoSpeak] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(false);\n  const [providerConfigured, setProviderConfigured] = useState(false);\n  const [modelTier, setModelTier] = useState<string>();
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   function stopRecognition() {
@@ -167,7 +167,7 @@ export default function WorkspaceClient() {
       const response = await fetch("/api/assistant", { cache: "no-store" });
       const payload = await response.json();
       if (!response.ok) { setStatus(payload.error?.message ?? "Could not load conversation history."); return; }
-      const items: ConversationItem[] = payload.conversations ?? [];
+      const items: ConversationItem[] = payload.conversations ?? [];\n      setProviderConfigured(Boolean(payload.providerConfigured));
       setConversations(items);
       if (preferLatest && items[0]) await loadConversation(items[0].id);
     } catch { setStatus("Could not reach conversation history."); }
@@ -228,7 +228,7 @@ export default function WorkspaceClient() {
     }
   }
 
-  useEffect(() => { void loadMemories(); void loadSecurityEvents(); void loadConversations(true); return () => { recognitionRef.current?.stop(); window.speechSynthesis?.cancel(); }; }, []);
+  useEffect(() => { void loadMemories(); void loadSecurityEvents(); void loadConversations(true); return () => { recognitionRef.current?.stop(); window.speechSynthesis?.cancel(); }; // eslint-disable-next-line react-hooks/exhaustive-deps\n  }, []);
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -249,7 +249,7 @@ export default function WorkspaceClient() {
         setStatus(payload.error?.message ?? "FRIDAY could not complete the request.");
         return;
       }
-      setConversationId(payload.conversationId);
+      setConversationId(payload.conversationId);\n      setModelTier(payload.modelTier);
       setMessages(previous => [...previous, { role: "assistant", content: payload.reply }]);
       if (autoSpeak) speakText(payload.reply);
       void loadConversations();
@@ -312,7 +312,7 @@ export default function WorkspaceClient() {
       <section className="workspace-chat">
         <div className="workspace-section-heading">
           <div><BrainCircuit /><div><h2>Talk to FRIDAY</h2><p>Private owner conversation</p></div></div>
-          <span className="service-pill">PROVIDER CONFIG REQUIRED</span>
+          <span className={providerConfigured ? "service-pill ready" : "service-pill"}>{providerConfigured ? "MODEL PROVIDER READY" : "PROVIDER CONFIG REQUIRED"}</span>
         </div>
         <div className="conversation-history" aria-label="Recent conversations">
           <button type="button" className="new-conversation-button" onClick={startNewConversation}>+ New conversation</button>
@@ -323,7 +323,7 @@ export default function WorkspaceClient() {
             <div className="chat-empty">
               <Sparkles size={24} />
               <h3>Ready when you are, Boss.</h3>
-              <p>The conversation service is prepared. Connect an approved model provider to enable replies.</p>
+              <p>{providerConfigured ? "Your model provider is connected. FRIDAY is ready for your instructions." : "Connect an approved model provider to enable FRIDAY replies."}</p>
             </div>
           )}
           {messages.map((item, index) => (
@@ -347,7 +347,7 @@ export default function WorkspaceClient() {
           <label>Speech language
             <select value={speechLanguage} onChange={event => setSpeechLanguage(event.target.value)}>
               <option value="en-KE">English (Kenya)</option>
-              <option value="sw-KE">Kiswahili (Kenya)</option>
+              <option value="sw-KE">Kiswahili (Kenya)</option>\n              <option value="sheng">Sheng / mixed (Kenyan English recognition)</option>
             </select>
           </label>
           <label className="auto-speak-toggle"><input type="checkbox" checked={autoSpeak} onChange={event => setAutoSpeak(event.target.checked)} /> Speak replies automatically</label>
@@ -357,7 +357,7 @@ export default function WorkspaceClient() {
           <button type="button" className="wake-word-button" onClick={toggleWakeWord} disabled={listening && !wakeWordActive}>{wakeWordActive ? "Stop wake phrase" : "Enable wake phrase"}</button>
         </div>
         <p className="voice-note">{wakeWordActive ? "Wake phrase mode listens for “Hey Friday” or “Friday” while this tab is open. Stop it anytime." : listening ? "Listening for your message. Tap the microphone permission prompt if shown." : "Push-to-talk is available. Wake phrase mode is optional and requires this page to stay open."} Browser speech recognition may send audio to the browser speech service; background listening is not guaranteed.</p>
-        {status && <p className="workspace-status" role="status">{status}</p>}
+        {modelTier && <p className="voice-note">Last response model tier: {modelTier}.</p>}\n        {status && <p className="workspace-status" role="status">{status}</p>}
         <p className="workspace-disclaimer">No external actions are executed from this chat. Sensitive actions require a separate approval workflow.</p>
       </section>
 

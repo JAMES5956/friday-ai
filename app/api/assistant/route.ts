@@ -41,7 +41,7 @@ export async function GET(request: Request) {
       .order("updated_at", { ascending: false })
       .limit(20);
     if (error) return fail("MEMORY_STORE_UNAVAILABLE", "Could not load conversations.", 503);
-    return NextResponse.json({ conversations: data ?? [] }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ conversations: data ?? [], providerConfigured: Boolean(process.env.AI_BASE_URL && process.env.AI_API_KEY && (process.env.AI_MODEL || process.env.AI_FAST_MODEL || process.env.AI_REASONING_MODEL)) }, { headers: { "Cache-Control": "no-store" } });
   }
 
   const { data: conversation, error: conversationError } = await supabase.from("conversations")
@@ -313,7 +313,7 @@ export async function POST(request: Request) {
   if (timestampError) console.error("FRIDAY could not refresh the conversation timestamp.");
 
   return NextResponse.json(
-    { conversationId, reply: generated.content },
+    { conversationId, reply: generated.content, modelTier: generated.modelTier },
     { headers: { "Cache-Control": "no-store" } }
   );
 }

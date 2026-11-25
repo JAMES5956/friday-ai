@@ -267,3 +267,5 @@ h1 span { color: var(--cyan); text-shadow: 0 0 35px rgba(112,228,244,.22); }
 .conversation-history .conversation-item-wrap{display:flex;flex:0 0 auto;align-items:stretch;gap:3px}
 .conversation-history .conversation-item-wrap .conversation-item{max-width:170px;min-width:105px}
 .conversation-history .conversation-item-wrap .conversation-delete-button{padding:4px 7px;color:#e59a9a;border-color:rgba(255,130,130,.2)}
+
+.service-pill.ready{border-color:rgba(112,228,244,.3);color:#8ceaf4}
