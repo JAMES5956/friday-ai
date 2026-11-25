@@ -77,7 +77,10 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
     const { error: completeError } = await supabase.from("agent_tasks").update({
       status: "completed", result_ciphertext: encryptPrivateData(result.content)
     }).eq("id", taskId).eq("owner_id", owner.user.id).eq("status", "in_progress");
-    if (completeError) {\n      await supabase.from("agent_tasks").update({ status: "failed", result_ciphertext: null }).eq("id", taskId).eq("owner_id", owner.user.id).eq("status", "completed");\n      return fail("TASK_RESULT_SAVE_FAILED", "The specialist replied, but its result could not be saved.", 503);\n    }
+    if (completeError) {
+      await supabase.from("agent_tasks").update({ status: "failed", result_ciphertext: null }).eq("id", taskId).eq("owner_id", owner.user.id).eq("status", "in_progress");
+      return fail("TASK_RESULT_SAVE_FAILED", "The specialist replied, but its result could not be saved.", 503);
+    }
 
     const { error: completeAuditError } = await supabase.from("agent_task_events").insert({
       owner_id: owner.user.id, task_id: taskId, actor_agent_id: agent.id, event_type: "task_completed",
@@ -90,7 +93,8 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
 
     const { error: memorySaveError } = await supabase.from("agent_memories").insert({
       owner_id: owner.user.id, agent_id: agent.id, memory_type: "working",
-      content_ciphertext: encryptPrivateData(`Completed task: ${task.title}\nResult summary: ${result.content.slice(0, 6000)}`),
+      content_ciphertext: encryptPrivateData(`Completed task: ${task.title}
+Result summary: ${result.content.slice(0, 6000)}`),
       source_agent_id: agent.id, sensitivity: "internal"
     });
     return NextResponse.json({
