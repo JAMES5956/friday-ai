@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { getOwnerSession } from "@/lib/auth/owner";
+import { generateAssistantReply } from "@/lib/ai/provider";
+import { buildConversation } from "@/lib/ai/orchestrator";
+import { evaluateRequestForApproval } from "@/lib/security/nexus";
 
 const MAX_BODY_BYTES = 16_384;
 const MAX_MESSAGE_LENGTH = 4_000;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-type AssistantPayload = {
-  message?: unknown;
-};
-
-function errorResponse(code: string, message: string, status: number) {
+function fail(code: string, message: string, status: number) {
   return NextResponse.json(
     { error: { code, message } },
     { status, headers: { "Cache-Control": "no-store" } }
@@ -15,71 +17,133 @@ function errorResponse(code: string, message: string, status: number) {
 }
 
 export async function POST(request: Request) {
-  const contentType = request.headers.get("content-type") ?? "";
-  if (!contentType.toLowerCase().includes("application/json")) {
-    return errorResponse(
-      "UNSUPPORTED_MEDIA_TYPE",
-      "Send the request as application/json.",
-      415
-    );
+  if (!(request.headers.get("content-type") ?? "").toLowerCase().includes("application/json")) {
+    return fail("UNSUPPORTED_MEDIA_TYPE", "Send application/json.", 415);
   }
 
   const declaredLength = Number(request.headers.get("content-length") ?? 0);
-  if (declaredLength > MAX_BODY_BYTES) {
-    return errorResponse(
-      "REQUEST_TOO_LARGE",
-      "The request is too large.",
-      413
-    );
-  }
+  if (declaredLength > MAX_BODY_BYTES) return fail("REQUEST_TOO_LARGE", "Request is too large.", 413);
 
-  let rawBody: string;
+  let raw: string;
   try {
-    rawBody = await request.text();
+    raw = await request.text();
   } catch {
-    return errorResponse("INVALID_BODY", "The request body could not be read.", 400);
+    return fail("INVALID_BODY", "Could not read request body.", 400);
+  }
+  if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) {
+    return fail("REQUEST_TOO_LARGE", "Request is too large.", 413);
   }
 
-  if (new TextEncoder().encode(rawBody).byteLength > MAX_BODY_BYTES) {
-    return errorResponse("REQUEST_TOO_LARGE", "The request is too large.", 413);
-  }
-
-  let payload: AssistantPayload;
+  let payload: { message?: unknown; conversationId?: unknown };
   try {
-    const parsed: unknown = JSON.parse(rawBody);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      return errorResponse("INVALID_PAYLOAD", "Send a JSON object.", 400);
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return fail("INVALID_PAYLOAD", "Send a JSON object.", 400);
     }
-    payload = parsed as AssistantPayload;
+    payload = parsed as typeof payload;
   } catch {
-    return errorResponse("INVALID_JSON", "Send a valid JSON request.", 400);
+    return fail("INVALID_JSON", "Send valid JSON.", 400);
   }
 
-  if (typeof payload.message !== "string" || payload.message.trim().length === 0) {
-    return errorResponse(
-      "MESSAGE_REQUIRED",
-      "Add a message before contacting FRIDAY.",
-      400
-    );
+  if (typeof payload.message !== "string" || !payload.message.trim()) {
+    return fail("MESSAGE_REQUIRED", "Add a message first.", 400);
   }
-
   if (payload.message.length > MAX_MESSAGE_LENGTH) {
-    return errorResponse(
-      "MESSAGE_TOO_LONG",
-      `Messages must be ${MAX_MESSAGE_LENGTH.toLocaleString()} characters or fewer.`,
-      413
+    return fail("MESSAGE_TOO_LONG", "Messages must be 4,000 characters or fewer.", 413);
+  }
+  if (payload.conversationId !== undefined &&
+      (typeof payload.conversationId !== "string" || !UUID_PATTERN.test(payload.conversationId))) {
+    return fail("INVALID_CONVERSATION", "Conversation identifier is invalid.", 400);
+  }
+
+  let owner;
+  try {
+    owner = await getOwnerSession();
+  } catch {
+    return fail("AUTH_NOT_CONFIGURED", "Owner authentication is not configured.", 503);
+  }
+  if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
+
+  const nexusDecision = evaluateRequestForApproval(payload.message);
+  if (!nexusDecision.allowed) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "OWNER_APPROVAL_REQUIRED",
+          message: "This request could have an external or irreversible effect. It needs a separate approval workflow before FRIDAY can act."
+        },
+        requiresApproval: true
+      },
+      { status: 409, headers: { "Cache-Control": "no-store" } }
     );
   }
 
-  // No model provider is configured yet. Fail closed instead of fabricating a reply.
+  const supabase = await createClient();
+  let conversationId = payload.conversationId as string | undefined;
+
+  if (conversationId) {
+    const { data, error } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("id", conversationId)
+      .eq("user_id", owner.user.id)
+      .maybeSingle();
+    if (error || !data) return fail("CONVERSATION_NOT_FOUND", "Conversation was not found.", 404);
+  } else {
+    const { data, error } = await supabase
+      .from("conversations")
+      .insert({ user_id: owner.user.id, title: payload.message.trim().slice(0, 72) })
+      .select("id")
+      .single();
+    if (error || !data) return fail("MEMORY_STORE_UNAVAILABLE", "Could not create a conversation. Check the database setup.", 503);
+    conversationId = data.id;
+  }
+
+  const { data: history, error: historyError } = await supabase
+    .from("messages")
+    .select("role, content")
+    .eq("conversation_id", conversationId)
+    .eq("user_id", owner.user.id)
+    .order("created_at", { ascending: true })
+    .limit(30);
+
+  if (historyError) return fail("MEMORY_STORE_UNAVAILABLE", "Could not load conversation history.", 503);
+
+  const userMessage = { role: "user" as const, content: payload.message.trim() };
+  const providerMessages = buildConversation([
+    ...(history ?? []).map(item => ({
+      role: item.role as "user" | "assistant",
+      content: item.content
+    })),
+    userMessage
+  ]);
+
+  const generated = await generateAssistantReply(providerMessages);
+  if (!generated.ok) {
+    const status = generated.code === "AI_PROVIDER_NOT_CONFIGURED" ? 503 : 502;
+    return fail(generated.code, generated.code === "AI_PROVIDER_NOT_CONFIGURED"
+      ? "The AI model provider is not configured yet."
+      : "The AI provider could not complete the request.", status);
+  }
+
+  const { error: saveUserError } = await supabase.from("messages").insert({
+    conversation_id: conversationId,
+    user_id: owner.user.id,
+    role: "user",
+    content: userMessage.content
+  });
+  if (saveUserError) return fail("MEMORY_STORE_UNAVAILABLE", "Could not save your message.", 503);
+
+  const { error: saveAssistantError } = await supabase.from("messages").insert({
+    conversation_id: conversationId,
+    user_id: owner.user.id,
+    role: "assistant",
+    content: generated.content
+  });
+  if (saveAssistantError) return fail("MEMORY_STORE_UNAVAILABLE", "The reply was generated but could not be saved.", 503);
+
   return NextResponse.json(
-    {
-      error: {
-        code: "AI_PROVIDER_NOT_CONFIGURED",
-        message: "FRIDAY's intelligence service is not connected yet."
-      },
-      available: false
-    },
-    { status: 503, headers: { "Cache-Control": "no-store" } }
+    { conversationId, reply: generated.content },
+    { headers: { "Cache-Control": "no-store" } }
   );
 }
