@@ -51,7 +51,7 @@ export async function POST(request: Request, route: { params: Promise<{ agentId:
     if (memory.agent_id === ctx.agent.id) return fail("INVALID_MEMORY_GRANT", "A specialist cannot share memory with itself.", 400);
     if (memory.sensitivity === "restricted") return fail("RESTRICTED_MEMORY", "Restricted memories cannot be shared with another agent.", 403);
     const { data: existing, error: existingError } = await ctx.supabase.from("agent_memory_grants")
-      .select("id, expires_at").eq("owner_id", ctx.owner.user.id).eq("memory_id", memory.id)
+      .select("id, expires_at, approved_at").eq("owner_id", ctx.owner.user.id).eq("memory_id", memory.id)
       .eq("from_agent_id", memory.agent_id).eq("to_agent_id", ctx.agent.id).is("revoked_at", null).maybeSingle();
     if (existingError) return fail("MEMORY_GRANTS_UNAVAILABLE", "Could not check existing sharing permission.", 503);
     const expiresAt = new Date(Date.now() + days * 86400000).toISOString();
@@ -68,7 +68,12 @@ export async function POST(request: Request, route: { params: Promise<{ agentId:
         user_id: ctx.owner.user.id, event_type: "agent_memory_share_renewed", severity: "info",
         details: { fromAgentId: memory.agent_id, toAgentId: ctx.agent.id, expiresAt }
       });
-      if (renewalAuditError) return fail("MEMORY_GRANT_AUDIT_FAILED", "The permission was renewed but its audit event could not be recorded. Revoke it if you do not want it active.", 503);
+      if (renewalAuditError) {
+        await ctx.supabase.from("agent_memory_grants")
+          .update({ expires_at: existing.expires_at, approved_at: existing.approved_at })
+          .eq("id", renewed.id).eq("owner_id", ctx.owner.user.id).is("revoked_at", null);
+        return fail("MEMORY_GRANT_AUDIT_FAILED", "The renewal was rolled back because its audit event could not be recorded.", 503);
+      }
       return NextResponse.json({ grant: renewed, renewed: true }, { headers: { "Cache-Control": "no-store" } });
     }
     const { data, error } = await ctx.supabase.from("agent_memory_grants").insert({
