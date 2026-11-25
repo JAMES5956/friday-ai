@@ -2,12 +2,19 @@ export type SecurityDecision =
   | { allowed: true; requiresApproval: false; reason: "routine_request" }
   | { allowed: false; requiresApproval: true; reason: "owner_approval_required" };
 
+// This deterministic phrase gate is a conservative first layer, not an intent model.
+// It deliberately blocks common conjugations and indirect "get this done" requests.
 const sensitiveActions =
-  "(?:send(?:ing)?|publish(?:ing)?|post(?:ing)?|share|sharing|forward(?:ing)?|email|message|call|book|booking|schedule|scheduling|invite|inviting|submit|submitting|upload|uploading|pay(?:ing)?|purchase|buy(?:ing)?|order|ordering|subscribe|transfer|withdraw|donate|invest|delete|deleting|erase|erasing|wipe|reset|revoke|cancel|cancelling|terminate|shutdown|change password|change permissions|grant access|export data)";
+  "(?:send|sends|sending|sent|publish|publishes|publishing|published|post|posts|posting|posted|share|shares|sharing|shared|forward|forwards|forwarding|forwarded|email|emails|emailing|message|messages|messaging|call|calls|calling|called|book|books|booking|booked|schedule|schedules|scheduling|scheduled|invite|invites|inviting|invited|submit|submits|submitting|submitted|upload|uploads|uploading|uploaded|pay|pays|paying|paid|purchase|purchases|purchasing|purchased|buy|buys|buying|bought|order|orders|ordering|ordered|subscribe|subscribes|subscribing|subscribed|transfer|transfers|transferring|transferred|withdraw|withdraws|withdrawing|withdrew|withdrawn|donate|donates|donating|donated|invest|invests|investing|invested|delete|deletes|deleting|deleted|erase|erases|erasing|erased|wipe|wipes|wiping|wiped|reset|resets|resetting|revoke|revokes|revoking|revoked|cancel|cancels|cancelling|cancelled|terminate|terminates|terminating|terminated|shutdown|shut down|change password|change permissions|grant access|export data)";
+
+const completedActions =
+  "(?:sent|published|posted|shared|forwarded|emailed|messaged|called|booked|scheduled|invited|submitted|uploaded|paid|purchased|bought|ordered|subscribed|transferred|withdrawn|donated|invested|deleted|erased|wiped|reset|revoked|cancelled|terminated)";
 
 const approvalPatterns = [
   new RegExp(`^\\s*(?:(?:please|kindly)\\s+)?${sensitiveActions}\\b`, "i"),
-  new RegExp(`\\b(?:please|kindly|could you|can you|would you|would you mind|i want you to|i need you to|i would like you to|go ahead and|proceed to)\\s+(?:(?:please|kindly)\\s+)?${sensitiveActions}\\b`, "i")
+  new RegExp(`\\b(?:please|kindly|could you|can you|would you|would you mind|i want you to|i need you to|i would like you to|go ahead and|proceed to)\\s+(?:(?:please|kindly)\\s+)?${sensitiveActions}\\b`, "i"),
+  new RegExp(`\\b(?:i want|i need|i would like|please|kindly|could you|can you|would you|would you mind|go ahead and|proceed to)\\s+(?:to\\s+)?(?:get|have|make)\\s+(?:this|that|it|them|the\\s+\\w+)\\s+${completedActions}\\b`, "i"),
+  new RegExp(`\\b(?:please|kindly|could you|can you|would you)\\s+(?:make sure|ensure)\\s+(?:this|that|it|them|the\\s+\\w+)\\s+(?:is|gets|will be)\\s+${completedActions}\\b`, "i")
 ];
 
 export function evaluateRequestForApproval(message: string): SecurityDecision {
