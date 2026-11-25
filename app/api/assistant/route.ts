@@ -68,7 +68,7 @@ export async function POST(request: Request) {
   }
   if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
 
-  let supabase;
+  let supabase: Awaited<ReturnType<typeof createClient>>;
   try {
     supabase = await createClient();
   } catch {
