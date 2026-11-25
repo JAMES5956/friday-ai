@@ -27,8 +27,14 @@ export async function POST(request: Request) {
   if (!url || !validateTwilioSignature(config.authToken, url, params, request.headers.get("x-twilio-signature"))) {
     return NextResponse.json({ error: "Webhook signature verification failed." }, { status: 403, headers: { "Cache-Control": "no-store" } });
   }
-  if (params.get("AccountSid") !== config.accountSid || !params.get("CallSid")) {
-    return NextResponse.json({ error: "Unrecognised telephony account or call." }, { status: 403 });
+  if (
+    params.get("AccountSid") !== config.accountSid ||
+    !params.get("CallSid") ||
+    params.get("Direction") !== "outbound-api" ||
+    params.get("From") !== config.fromNumber ||
+    params.get("To") !== config.ownerNumber
+  ) {
+    return NextResponse.json({ error: "Unrecognised owner test call." }, { status: 403, headers: { "Cache-Control": "no-store" } });
   }
 
   return twimlResponse(
