@@ -57,6 +57,26 @@ export default function WorkspaceClient() {
     }
   }
 
+  async function deleteMemory(id: string) {
+    const confirmed = window.confirm("Permanently delete this saved memory?");
+    if (!confirmed) return;
+    try {
+      const response = await fetch("/api/memory", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        setStatus(payload.error ?? "Could not delete memory.");
+        return;
+      }
+      await loadMemories();
+    } catch {
+      setStatus("Could not reach the memory service.");
+    }
+  }
+
   async function saveMemory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const content = memoryDraft.trim();
@@ -126,7 +146,7 @@ export default function WorkspaceClient() {
         <div className="memory-list">
           {memories.length === 0
             ? <p className="memory-empty">No saved notes yet. Database configuration is required.</p>
-            : memories.map(memory => <article className="memory-item" key={memory.id}><span>{memory.category}</span><p>{memory.content}</p></article>)}
+            : memories.map(memory => <article className="memory-item" key={memory.id}><div className="memory-item-heading"><span>{memory.category}</span><button type="button" onClick={() => void deleteMemory(memory.id)}>Delete</button></div><p>{memory.content}</p></article>)}
         </div>
       </aside>
     </div>
