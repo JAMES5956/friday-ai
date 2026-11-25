@@ -6,7 +6,7 @@ import { specialistAgents } from "@/lib/agents/registry";
 
 type AgentMemory = { id: string; memoryType: string; sensitivity: string; content: string; expiresAt: string | null; createdAt: string };
 type MemoryGrant = { id: string; memory_id: string; from_agent_id: string; to_agent_id: string; expires_at: string };
-const agents = specialistAgents.filter(agent => agent.id !== "friday");
+const agents = specialistAgents.filter(agent => agent.id !== "friday" && agent.id !== "nexus");
 
 export default function AgentMemoryPanel() {
   const [agentId, setAgentId] = useState("oracle");
@@ -96,7 +96,7 @@ export default function AgentMemoryPanel() {
     <div className="workspace-section-heading"><div><Brain /><div><h2>Specialist memory control</h2><p>Separate encrypted memory for each agent, with owner-managed sharing</p></div></div><button className="icon-button" type="button" onClick={() => { void loadMemories(); void loadGrants(); }} aria-label="Refresh agent memory"><RefreshCw size={15} /></button></div>
     <div className="agent-memory-controls">
       <label>Agent memory<select value={agentId} onChange={event => setAgentId(event.target.value)}>{agents.map(agent => <option key={agent.id} value={agent.id}>{agent.name} — {agent.role}</option>)}</select></label>
-      <label>Share access with<select value={recipientId} onChange={event => setRecipientId(event.target.value)}>{specialistAgents.filter(agent => agent.id !== agentId).map(agent => <option key={agent.id} value={agent.id}>{agent.name}</option>)}</select></label>
+      <label>Share access with<select value={recipientId} onChange={event => setRecipientId(event.target.value)}>{specialistAgents.filter(agent => agent.id !== agentId && agent.id !== "friday" && agent.id !== "nexus").map(agent => <option key={agent.id} value={agent.id}>{agent.name}</option>)}</select></label>
     </div>
     <form className="memory-form" onSubmit={saveMemory}>
       <textarea value={draft} onChange={event => setDraft(event.target.value)} maxLength={10000} rows={3} placeholder={"Add a private note for " + agentName(agentId) + "..."} />

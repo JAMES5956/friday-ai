@@ -13,7 +13,7 @@ function fail(code: string, message: string, status: number) {
 }
 async function context(agentId: string) {
   const agent = specialistAgents.find(item => item.id === agentId);
-  if (!agent) return { response: fail("INVALID_AGENT", "Choose a registered agent.", 400) };
+  if (!agent || agent.id === "friday" || agent.id === "nexus") return { response: fail("INVALID_AGENT", "FRIDAY and NEXUS memory are isolated from the specialist memory panel.", 400) };
   const owner = await getOwnerSession();
   if (!owner.user) return { response: fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401) };
   const supabase = await createClient();
@@ -27,6 +27,7 @@ export async function GET(_request: Request, route: { params: Promise<{ agentId:
     const { data, error } = await ctx.supabase.from("agent_memories")
       .select("id, memory_type, sensitivity, content_ciphertext, source_agent_id, expires_at, created_at, updated_at")
       .eq("owner_id", ctx.owner.user.id).eq("agent_id", agentId)
+      .or("expires_at.is.null,expires_at.gt." + new Date().toISOString())
       .order("updated_at", { ascending: false }).limit(100);
     if (error) return fail("AGENT_MEMORY_UNAVAILABLE", "Could not load this specialist's private memory. Apply migration 0003.", 503);
     try {
