@@ -29,11 +29,7 @@ export default function LoginPage() {
       if (signInError) throw signInError;
 
       const { data } = await supabase.auth.getUser();
-      const ownerEmail = process.env.NEXT_PUBLIC_FRIDAY_OWNER_EMAIL;
-      if (ownerEmail && data.user?.email?.toLowerCase() !== ownerEmail.toLowerCase()) {
-        await supabase.auth.signOut();
-        throw new Error("This account is not authorised to access FRIDAY.");
-      }
+      if (!data.user) throw new Error("Could not verify the signed-in account.");
 
       router.replace("/workspace");
       router.refresh();
