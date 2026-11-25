@@ -67,6 +67,9 @@ describe("NEXUS approval gate", () => {
     expect(evaluateRequestForApproval("Could you send this email?").requiresApproval).toBe(true);
     expect(evaluateRequestForApproval("Could you please send this email?").requiresApproval).toBe(true);
     expect(evaluateRequestForApproval("I need you to kindly transfer the funds").requiresApproval).toBe(true);
+    expect(evaluateRequestForApproval("Would you mind sending this email?").requiresApproval).toBe(true);
+    expect(evaluateRequestForApproval("Could you please publish this update?").requiresApproval).toBe(true);
+    expect(evaluateRequestForApproval("I would like you to delete this file").requiresApproval).toBe(true);
   });
 
   it("does not block informational questions that merely mention sensitive actions", () => {
