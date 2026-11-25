@@ -24,3 +24,9 @@ export function evaluateRequestForApproval(message: string): SecurityDecision {
   }
   return { allowed: true, requiresApproval: false, reason: "routine_request" };
 }
+
+// Task metadata can contain the actual instruction even when the description
+// looks harmless. Evaluate every owner-visible field before queueing a task.
+export function evaluateTaskForApproval(title: string, description: string): SecurityDecision {
+  return evaluateRequestForApproval(`${title.trim()}\n\n${description.trim()}`);
+}
