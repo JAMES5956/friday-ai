@@ -13,7 +13,7 @@ export async function GET() {
     return NextResponse.json({ error: "Owner authentication required." }, { status: 401 });
   }
 
-  let supabase;
+  let supabase: Awaited<ReturnType<typeof createClient>>;
   try {
     supabase = await createClient();
   } catch {
