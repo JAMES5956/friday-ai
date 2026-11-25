@@ -39,6 +39,10 @@ describe("private data encryption", () => {
     process.env.FRIDAY_DATA_ENCRYPTION_KEY = Buffer.alloc(16, 7).toString("base64");
     expect(() => encryptPrivateData("private")).toThrow();
   });
+
+  it("fails closed on legacy plaintext instead of silently returning it", () => {
+    expect(() => decryptPrivateData("old unencrypted private text")).toThrow();
+  });
 });
 
 describe("NEXUS approval gate", () => {
@@ -46,9 +50,17 @@ describe("NEXUS approval gate", () => {
     expect(evaluateRequestForApproval("Explain how a database index works").allowed).toBe(true);
   });
 
-  it("blocks financial or external actions pending an approval workflow", () => {
+  it("blocks direct financial, external and destructive action requests", () => {
     expect(evaluateRequestForApproval("Transfer money to this account").requiresApproval).toBe(true);
     expect(evaluateRequestForApproval("Publish this announcement").requiresApproval).toBe(true);
+    expect(evaluateRequestForApproval("Please delete this file").requiresApproval).toBe(true);
+    expect(evaluateRequestForApproval("Could you send this email?").requiresApproval).toBe(true);
+  });
+
+  it("does not block informational questions that merely mention sensitive actions", () => {
+    expect(evaluateRequestForApproval("How do I send an email?").allowed).toBe(true);
+    expect(evaluateRequestForApproval("Explain how to delete a local file safely").allowed).toBe(true);
+    expect(evaluateRequestForApproval("What is the process for transferring money?").allowed).toBe(true);
   });
 });
 
