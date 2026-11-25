@@ -16,6 +16,9 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     const owner = await getOwnerSession();
     if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
     const supabase = await createClient();
+    const { data: withinLimit, error: rateError } = await supabase.rpc("consume_rate_limit", { p_limit: 10 });
+    if (rateError) return fail("SECURITY_LIMITER_UNAVAILABLE", "NEXUS request protection is unavailable.", 503);
+    if (!withinLimit) return fail("RATE_LIMITED", "Too many approval attempts. Wait before trying again.", 429);
     const { data, error } = await supabase.from("agent_tasks")
       .update({ status: "queued", owner_approved_at: new Date().toISOString(), owner_approved_by: owner.user.id })
       .eq("id", taskId).eq("owner_id", owner.user.id).eq("status", "awaiting_approval")
