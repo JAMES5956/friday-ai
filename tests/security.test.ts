@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { decryptPrivateData, encryptPrivateData } from "../lib/security/encryption";
-import { evaluateRequestForApproval } from "../lib/security/nexus";
+import { evaluateRequestForApproval, evaluateTaskForApproval } from "../lib/security/nexus";
 import { buildConversation } from "../lib/ai/orchestrator";
 
 const originalKey = process.env.FRIDAY_DATA_ENCRYPTION_KEY;
@@ -78,6 +78,12 @@ describe("NEXUS approval gate", () => {
     expect(evaluateRequestForApproval("Could you have that email sent?").requiresApproval).toBe(true);
     expect(evaluateRequestForApproval("Please make sure this is deleted").requiresApproval).toBe(true);
     expect(evaluateRequestForApproval("I need to get the report submitted").requiresApproval).toBe(true);
+  });
+
+  it("checks task titles as well as descriptions before queueing", () => {
+    expect(evaluateTaskForApproval("Transfer funds", "Prepare a short note").requiresApproval).toBe(true);
+    expect(evaluateTaskForApproval("Routine research", "Explain how transfers work").allowed).toBe(true);
+    expect(evaluateTaskForApproval("Routine research", "Please publish this announcement").requiresApproval).toBe(true);
   });
 
   it("does not block informational questions that merely mention sensitive actions", () => {
