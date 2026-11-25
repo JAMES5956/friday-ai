@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { ClipboardList, RefreshCw, ShieldCheck, Send } from "lucide-react";
 import { specialistAgents } from "@/lib/agents/registry";
+import { buildSpecialistReviewPrompt } from "@/lib/agents/review";
 
 type Task = { id: string; assigned_agent_id: string; title: string; description: string; result?: string | null; status: string; created_at: string };
 
@@ -13,6 +14,8 @@ export default function TaskCenter() {
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const [reviewingTaskId, setReviewingTaskId] = useState<string | null>(null);
+  const [reviewResult, setReviewResult] = useState<{ taskId: string; content: string } | null>(null);
 
   const loadTasks = useCallback(async () => {
     try {
@@ -50,6 +53,23 @@ export default function TaskCenter() {
     finally { setBusy(false); }
   }
 
+  async function reviewWithFriday(task: Task) {
+    if (!task.result || busy) return;
+    setBusy(true); setReviewingTaskId(task.id); setStatus("");
+    try {
+      const response = await fetch("/api/assistant", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: buildSpecialistReviewPrompt(agentName(task.assigned_agent_id), task.title, task.result), includeMemory: false })
+      });
+      const payload = await response.json();
+      if (!response.ok) { setStatus(payload.error?.message ?? "FRIDAY could not review this result."); return; }
+      setReviewResult({ taskId: task.id, content: payload.reply });
+      window.dispatchEvent(new Event("friday:conversation-refresh"));
+      setStatus("FRIDAY has reviewed the specialist result. The review is also saved in conversation history.");
+    } catch { setStatus("Could not reach FRIDAY to review this result."); }
+    finally { setBusy(false); setReviewingTaskId(null); }
+  }
+
   async function approveTask(taskId: string) {
     if (busy) return;
     setBusy(true); setStatus("");
@@ -74,7 +94,7 @@ export default function TaskCenter() {
     {status && <p className="workspace-status" role="status">{status}</p>}
     <div className="task-list">{tasks.length === 0 ? <p className="memory-empty">No tasks yet. Create a task above to start the delegation queue.</p> : tasks.map(task => <article className="task-item" key={task.id}>
       <div className="task-item-top"><div><strong>{task.title}</strong><span>{agentName(task.assigned_agent_id)} · {new Date(task.created_at).toLocaleString()}</span></div><span className={`task-status ${task.status}`}>{task.status.replaceAll("_", " ")}</span></div>
-      <p>{task.description}</p>{task.result && <div className="task-result"><strong>Specialist result</strong><p>{task.result}</p></div>}{task.status === "queued" && <button type="button" disabled={busy} onClick={() => void runTask(task.id)}><Send size={15} /> Run specialist</button>}{task.status === "failed" && <button type="button" disabled={busy} onClick={() => void runTask(task.id)}>Retry specialist</button>}{task.status === "awaiting_approval" && <button type="button" disabled={busy} onClick={() => void approveTask(task.id)}><ShieldCheck size={15} /> Approve task</button>}
+      <p>{task.description}</p>{task.result && <div className="task-result"><strong>Specialist result</strong><p>{task.result}</p><button type="button" disabled={busy} onClick={() => void reviewWithFriday(task)}>{reviewingTaskId === task.id ? "FRIDAY reviewing..." : "Ask FRIDAY to review"}</button></div>}{reviewResult?.taskId === task.id && <div className="task-result friday-review"><strong>FRIDAY’s synthesis</strong><p>{reviewResult.content}</p></div>}{task.status === "queued" && <button type="button" disabled={busy} onClick={() => void runTask(task.id)}><Send size={15} /> Run specialist</button>}{task.status === "failed" && <button type="button" disabled={busy} onClick={() => void runTask(task.id)}>Retry specialist</button>}{task.status === "awaiting_approval" && <button type="button" disabled={busy} onClick={() => void approveTask(task.id)}><ShieldCheck size={15} /> Approve task</button>}
     </article>)}</div>
     <p className="task-safety-note">Running a queued task invokes only its assigned specialist model and private working memory. Specialists cannot execute external actions. Sensitive tasks remain blocked until you approve them.</p>
   </section>;

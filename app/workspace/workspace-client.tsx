@@ -237,6 +237,11 @@ export default function WorkspaceClient() {
 
   useEffect(() => { void loadMemories(); void loadSecurityEvents(); void loadConversations(true); return () => { recognitionRef.current?.stop(); window.speechSynthesis?.cancel(); }; // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+    const refreshConversations = () => { void loadConversations(); };
+    window.addEventListener("friday:conversation-refresh", refreshConversations);
+    return () => window.removeEventListener("friday:conversation-refresh", refreshConversations);
+  }, [loadConversations]);
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
