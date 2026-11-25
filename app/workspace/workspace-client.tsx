@@ -1,7 +1,23 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { BrainCircuit, Send, ShieldCheck, Sparkles, Plus, RefreshCw } from "lucide-react";
+import { BrainCircuit, Send, ShieldCheck, Sparkles, Plus, RefreshCw, Mic, Volume2 } from "lucide-react";
+
+type SpeechResultEvent = { results: ArrayLike<ArrayLike<{ transcript: string }>> };
+type SpeechRecognitionLike = {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((event: SpeechResultEvent) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+type SpeechWindow = Window & {
+  SpeechRecognition?: new () => SpeechRecognitionLike;
+  webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+};
 
 type ChatItem = { role: "user" | "assistant"; content: string };
 type MemoryItem = { id: string; category: string; content: string; created_at: string };
@@ -16,6 +32,52 @@ export default function WorkspaceClient() {
   const [memories, setMemories] = useState<MemoryItem[]>([]);
   const [memoryDraft, setMemoryDraft] = useState("");
   const [memoryBusy, setMemoryBusy] = useState(false);
+  const [listening, setListening] = useState(false);
+
+  function startVoiceInput() {
+    const speechWindow = window as SpeechWindow;
+    const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    if (!Recognition) {
+      setStatus("Voice input is not supported by this browser. Try a current version of Chrome.");
+      return;
+    }
+    const recognition = new Recognition();
+    recognition.lang = "en-KE";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = event => {
+      const transcript = event.results[0]?.[0]?.transcript;
+      if (transcript) setDraft(previous => previous ? previous + " " + transcript : transcript);
+    };
+    recognition.onerror = () => setStatus("Microphone input failed or permission was denied.");
+    recognition.onend = () => setListening(false);
+    setListening(true);
+    try {
+      recognition.start();
+    } catch {
+      setListening(false);
+      setStatus("Could not start microphone input.");
+    }
+  }
+
+  function speakLatestReply() {
+    const latestReply = [...messages].reverse().find(item => item.role === "assistant");
+    if (!latestReply || !("speechSynthesis" in window)) {
+      setStatus("Speech output is not available in this browser yet.");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(latestReply.content);
+    utterance.lang = "en-KE";
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(voice => voice.lang.toLowerCase() === "en-ke")
+      ?? voices.find(voice => voice.lang.toLowerCase().startsWith("en-gb"))
+      ?? voices.find(voice => voice.lang.toLowerCase().startsWith("en-us"));
+    if (preferredVoice) utterance.voice = preferredVoice;
+    utterance.rate = 1;
+    utterance.pitch = 1.02;
+    window.speechSynthesis.speak(utterance);
+  }
 
   async function loadMemories() {
     try {
@@ -133,8 +195,11 @@ export default function WorkspaceClient() {
         </label>
         <form className="chat-composer" onSubmit={sendMessage}>
           <textarea value={draft} onChange={event => setDraft(event.target.value)} placeholder="Send a message to FRIDAY..." maxLength={4000} rows={2} />
+          <button type="button" onClick={startVoiceInput} disabled={listening} aria-label="Speak to FRIDAY"><Mic size={17} /></button>
           <button type="submit" disabled={!draft.trim() || sending} aria-label="Send message"><Send size={17} /></button>
         </form>
+        <button type="button" className="speech-output-button" onClick={speakLatestReply}><Volume2 size={14} /> Speak latest FRIDAY reply</button>
+        <p className="voice-note">{listening ? "Listening for your message. Tap the microphone permission prompt if shown." : "Voice input is push-to-talk only. No background listening is enabled."}</p>
         {status && <p className="workspace-status" role="status">{status}</p>}
         <p className="workspace-disclaimer">No external actions are executed from this chat. Sensitive actions require a separate approval workflow.</p>
       </section>
