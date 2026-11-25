@@ -27,8 +27,10 @@ The current application is a web interface foundation. It does not yet contain a
 - Responsive landing interface.
 - Server-rendered application shell.
 - Basic health endpoint at /api/health.
+- Validated assistant API boundary with explicit unavailable response until a provider is configured.
+- Baseline browser security headers.
 - GitHub Actions quality-check workflow.
 
 ## Next engineering milestone
 
-Establish authentication and a server-side request boundary before connecting model providers or storing personal memory.
+Establish authentication and a server-side request boundary before connecting model providers or storing personal memory. The current assistant route is intentionally not exposed as a working chatbot until authentication and provider configuration are in place.
