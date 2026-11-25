@@ -10,6 +10,7 @@ export default function WorkspaceClient() {
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [draft, setDraft] = useState("");
   const [conversationId, setConversationId] = useState<string>();
+  const [includeMemory, setIncludeMemory] = useState(false);
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState("");
   const [memories, setMemories] = useState<MemoryItem[]>([]);
@@ -41,7 +42,7 @@ export default function WorkspaceClient() {
       const response = await fetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: content, conversationId })
+        body: JSON.stringify({ message: content, conversationId, includeMemory })
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -126,6 +127,10 @@ export default function WorkspaceClient() {
           ))}
           {sending && <div className="chat-message assistant"><span>FRIDAY</span><p>Thinking...</p></div>}
         </div>
+        <label className="memory-context-toggle">
+          <input type="checkbox" checked={includeMemory} onChange={event => setIncludeMemory(event.target.checked)} />
+          Include my saved memories in this conversation
+        </label>
         <form className="chat-composer" onSubmit={sendMessage}>
           <textarea value={draft} onChange={event => setDraft(event.target.value)} placeholder="Send a message to FRIDAY..." maxLength={4000} rows={2} />
           <button type="submit" disabled={!draft.trim() || sending} aria-label="Send message"><Send size={17} /></button>
