@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnerSession } from "@/lib/auth/owner";
 import { encryptPrivateData, decryptPrivateData } from "@/lib/security/encryption";
-import { evaluateRequestForApproval } from "@/lib/security/nexus";
+import { evaluateTaskForApproval } from "@/lib/security/nexus";
 import { specialistAgents } from "@/lib/agents/registry";
 
 export const dynamic = "force-dynamic";
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     const owner = await getOwnerSession();
     if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
     const supabase = await createClient();
-    const decision = evaluateRequestForApproval(input.description);
+    const decision = evaluateTaskForApproval(input.title, input.description);
     const status = decision.requiresApproval ? "awaiting_approval" : "queued";
     const taskCiphertext = encryptPrivateData(input.description.trim());
     const { data, error } = await supabase.from("agent_tasks").insert({
