@@ -191,6 +191,22 @@ export default function WorkspaceClient() {
     setStatus("");
   }
 
+  async function deleteConversation(id: string) {
+    if (!window.confirm("Permanently delete this conversation and its messages?")) return;
+    try {
+      const response = await fetch("/api/assistant", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: id })
+      });
+      const payload = await response.json();
+      if (!response.ok) { setStatus(payload.error?.message ?? "Could not delete this conversation."); return; }
+      setConversations(previous => previous.filter(item => item.id !== id));
+      if (conversationId === id) startNewConversation();
+      setStatus("Conversation deleted.");
+    } catch { setStatus("Could not reach the conversation service."); }
+  }
+
   async function loadMemories() {
     try {
       const response = await fetch("/api/memory", { cache: "no-store" });
@@ -300,7 +316,7 @@ export default function WorkspaceClient() {
         </div>
         <div className="conversation-history" aria-label="Recent conversations">
           <button type="button" className="new-conversation-button" onClick={startNewConversation}>+ New conversation</button>
-          {conversations.map(item => <button type="button" key={item.id} className={conversationId === item.id ? "conversation-item active" : "conversation-item"} onClick={() => void loadConversation(item.id)}>{item.title || "Private conversation"}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}
+          {conversations.map(item => <div className="conversation-item-wrap" key={item.id}><button type="button" className={conversationId === item.id ? "conversation-item active" : "conversation-item"} onClick={() => void loadConversation(item.id)}>{item.title || "Private conversation"}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button><button type="button" className="conversation-delete-button" onClick={() => void deleteConversation(item.id)} aria-label="Delete conversation">×</button></div>)}
         </div>
         <div className="chat-transcript" aria-live="polite">
           {messages.length === 0 && (

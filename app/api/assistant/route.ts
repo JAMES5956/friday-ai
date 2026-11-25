@@ -56,12 +56,12 @@ export async function GET(request: Request) {
     .eq("conversation_id", requestedId)
     .eq("user_id", owner.user.id)
     .in("role", ["user", "assistant"])
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .limit(100);
   if (error) return fail("MEMORY_STORE_UNAVAILABLE", "Could not load conversation history.", 503);
 
   try {
-    const messages = (rows ?? []).map(row => ({
+    const messages = (rows ?? []).slice().reverse().map(row => ({
       role: row.role as "user" | "assistant",
       content: decryptPrivateData(row.content),
       createdAt: row.created_at
@@ -70,6 +70,40 @@ export async function GET(request: Request) {
   } catch {
     return fail("PRIVATE_DATA_UNREADABLE", "Conversation history could not be decrypted. Check the encryption key.", 503);
   }
+}
+
+
+export async function DELETE(request: Request) {
+  if (!(request.headers.get("content-type") ?? "").toLowerCase().includes("application/json")) return fail("UNSUPPORTED_MEDIA_TYPE", "Send application/json.", 415);
+  const declaredLength = Number(request.headers.get("content-length") ?? 0);
+  if (declaredLength > 1_024) return fail("REQUEST_TOO_LARGE", "Request is too large.", 413);
+  let payload: { conversationId?: unknown };
+  try {
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).byteLength > 1_024) return fail("REQUEST_TOO_LARGE", "Request is too large.", 413);
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return fail("INVALID_PAYLOAD", "Send a JSON object.", 400);
+    payload = parsed as typeof payload;
+  } catch { return fail("INVALID_JSON", "Send valid JSON.", 400); }
+  if (typeof payload.conversationId !== "string" || !UUID_PATTERN.test(payload.conversationId)) return fail("INVALID_CONVERSATION", "Conversation identifier is invalid.", 400);
+
+  let owner;
+  try { owner = await getOwnerSession(); }
+  catch { return fail("AUTH_NOT_CONFIGURED", "Owner authentication is not configured.", 503); }
+  if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
+  let supabase: Awaited<ReturnType<typeof createClient>>;
+  try { supabase = await createClient(); }
+  catch { return fail("DATABASE_NOT_CONFIGURED", "Private database access is not configured.", 503); }
+
+  const { data: withinLimit, error: rateLimitError } = await supabase.rpc("consume_rate_limit", { p_limit: 20 });
+  if (rateLimitError) return fail("SECURITY_LIMITER_UNAVAILABLE", "NEXUS request protection is unavailable.", 503);
+  if (!withinLimit) return fail("RATE_LIMITED", "Too many requests. Wait before trying again.", 429);
+
+  const { data, error } = await supabase.from("conversations").delete()
+    .eq("id", payload.conversationId).eq("user_id", owner.user.id).select("id").maybeSingle();
+  if (error) return fail("CONVERSATION_DELETE_FAILED", "Could not delete this conversation.", 503);
+  if (!data) return fail("CONVERSATION_NOT_FOUND", "Conversation was not found.", 404);
+  return NextResponse.json({ deleted: true }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -213,7 +247,7 @@ export async function POST(request: Request) {
     .select("role, content")
     .eq("conversation_id", conversationId)
     .eq("user_id", owner.user.id)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .limit(30);
   if (historyError) return fail("MEMORY_STORE_UNAVAILABLE", "Could not load conversation history.", 503);
 
@@ -238,7 +272,7 @@ export async function POST(request: Request) {
   let providerMessages;
   try {
     providerMessages = buildConversation([
-      ...(history ?? []).map(item => ({
+      ...(history ?? []).slice().reverse().map(item => ({
         role: item.role as "user" | "assistant",
         content: decryptPrivateData(item.content)
       })),
@@ -271,6 +305,12 @@ export async function POST(request: Request) {
     content: encryptPrivateData(generated.content)
   });
   if (saveAssistantError) return fail("MEMORY_STORE_UNAVAILABLE", "The reply was generated but could not be saved.", 503);
+
+  const { error: timestampError } = await supabase.from("conversations")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", conversationId)
+    .eq("user_id", owner.user.id);
+  if (timestampError) console.error("FRIDAY could not refresh the conversation timestamp.");
 
   return NextResponse.json(
     { conversationId, reply: generated.content },
