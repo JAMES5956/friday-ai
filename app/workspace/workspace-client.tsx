@@ -20,13 +20,13 @@ type SpeechWindow = Window & {
 };
 
 type ChatItem = { role: "user" | "assistant"; content: string };
-type MemoryItem = { id: string; category: string; content: string; created_at: string };
+type ConversationItem = { id: string; title: string; updated_at: string };\ntype MemoryItem = { id: string; category: string; content: string; created_at: string };
 type SecurityEvent = { id: string; event_type: string; severity: string; created_at: string };
 
 export default function WorkspaceClient() {
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [draft, setDraft] = useState("");
-  const [conversationId, setConversationId] = useState<string>();
+  const [conversationId, setConversationId] = useState<string>();\n  const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [includeMemory, setIncludeMemory] = useState(false);
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState("");
@@ -81,6 +81,36 @@ export default function WorkspaceClient() {
     window.speechSynthesis.speak(utterance);
   }
 
+
+  async function loadConversations(preferLatest = false) {
+    try {
+      const response = await fetch("/api/assistant", { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) { setStatus(payload.error?.message ?? "Could not load conversation history."); return; }
+      const items: ConversationItem[] = payload.conversations ?? [];
+      setConversations(items);
+      if (preferLatest && items[0]) await loadConversation(items[0].id);
+    } catch { setStatus("Could not reach conversation history."); }
+  }
+
+  async function loadConversation(id: string) {
+    try {
+      const response = await fetch("/api/assistant?conversationId=" + encodeURIComponent(id), { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) { setStatus(payload.error?.message ?? "Could not load this conversation."); return; }
+      setConversationId(id);
+      setMessages((payload.messages ?? []).map((item: ChatItem) => ({ role: item.role, content: item.content })));
+      setStatus("");
+    } catch { setStatus("Could not reach conversation history."); }
+  }
+
+  function startNewConversation() {
+    setConversationId(undefined);
+    setMessages([]);
+    setDraft("");
+    setStatus("");
+  }
+
   async function loadMemories() {
     try {
       const response = await fetch("/api/memory", { cache: "no-store" });
@@ -102,7 +132,7 @@ export default function WorkspaceClient() {
     }
   }
 
-  useEffect(() => { void loadMemories(); void loadSecurityEvents(); }, []);
+  useEffect(() => { void loadMemories(); void loadSecurityEvents(); void loadConversations(true); }, []);
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -124,7 +154,7 @@ export default function WorkspaceClient() {
         return;
       }
       setConversationId(payload.conversationId);
-      setMessages(previous => [...previous, { role: "assistant", content: payload.reply }]);
+      setMessages(previous => [...previous, { role: "assistant", content: payload.reply }]);\n      void loadConversations();
     } catch {
       setStatus("The FRIDAY service could not be reached.");
     } finally {
@@ -186,7 +216,7 @@ export default function WorkspaceClient() {
           <div><BrainCircuit /><div><h2>Talk to FRIDAY</h2><p>Private owner conversation</p></div></div>
           <span className="service-pill">PROVIDER CONFIG REQUIRED</span>
         </div>
-        <div className="chat-transcript" aria-live="polite">
+        <div className="conversation-history" aria-label="Recent conversations">\n          <button type="button" className="new-conversation-button" onClick={startNewConversation}>+ New conversation</button>\n          {conversations.map(item => <button type="button" key={item.id} className={conversationId === item.id ? "conversation-item active" : "conversation-item"} onClick={() => void loadConversation(item.id)}>{item.title || "Private conversation"}<small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}\n        </div>\n        <div className="chat-transcript" aria-live="polite">
           {messages.length === 0 && (
             <div className="chat-empty">
               <Sparkles size={24} />

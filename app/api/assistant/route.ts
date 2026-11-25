@@ -17,6 +17,61 @@ function fail(code: string, message: string, status: number) {
   );
 }
 
+
+export async function GET(request: Request) {
+  let owner;
+  try { owner = await getOwnerSession(); }
+  catch { return fail("AUTH_NOT_CONFIGURED", "Owner authentication is not configured.", 503); }
+  if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
+
+  let supabase: Awaited<ReturnType<typeof createClient>>;
+  try { supabase = await createClient(); }
+  catch { return fail("DATABASE_NOT_CONFIGURED", "Private database access is not configured.", 503); }
+
+  const url = new URL(request.url);
+  const requestedId = url.searchParams.get("conversationId");
+  if (requestedId && !UUID_PATTERN.test(requestedId)) {
+    return fail("INVALID_CONVERSATION", "Conversation identifier is invalid.", 400);
+  }
+
+  if (!requestedId) {
+    const { data, error } = await supabase.from("conversations")
+      .select("id, title, updated_at")
+      .eq("user_id", owner.user.id)
+      .order("updated_at", { ascending: false })
+      .limit(20);
+    if (error) return fail("MEMORY_STORE_UNAVAILABLE", "Could not load conversations.", 503);
+    return NextResponse.json({ conversations: data ?? [] }, { headers: { "Cache-Control": "no-store" } });
+  }
+
+  const { data: conversation, error: conversationError } = await supabase.from("conversations")
+    .select("id, title, updated_at")
+    .eq("id", requestedId)
+    .eq("user_id", owner.user.id)
+    .maybeSingle();
+  if (conversationError || !conversation) return fail("CONVERSATION_NOT_FOUND", "Conversation was not found.", 404);
+
+  const { data: rows, error } = await supabase.from("messages")
+    .select("role, content, created_at")
+    .eq("conversation_id", requestedId)
+    .eq("user_id", owner.user.id)
+    .in("role", ["user", "assistant"])
+    .order("created_at", { ascending: true })
+    .limit(100);
+  if (error) return fail("MEMORY_STORE_UNAVAILABLE", "Could not load conversation history.", 503);
+
+  try {
+    const messages = (rows ?? []).map(row => ({
+      role: row.role as "user" | "assistant",
+      content: decryptPrivateData(row.content),
+      createdAt: row.created_at
+    }));
+    return NextResponse.json({ conversation, messages }, { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return fail("PRIVATE_DATA_UNREADABLE", "Conversation history could not be decrypted. Check the encryption key.", 503);
+  }
+}
+
 export async function POST(request: Request) {
   if (!(request.headers.get("content-type") ?? "").toLowerCase().includes("application/json")) {
     return fail("UNSUPPORTED_MEDIA_TYPE", "Send application/json.", 415);

@@ -247,3 +247,9 @@ h1 span { color: var(--cyan); text-shadow: 0 0 35px rgba(112,228,244,.22); }
 .task-status.completed{background:rgba(34,197,94,.12);color:#4ade80}
 .task-safety-note{margin-top:16px}
 @media(max-width:600px){.task-center{padding:16px}.task-item-top{flex-direction:column}}
+
+.conversation-history{display:flex;gap:7px;overflow-x:auto;margin:14px 0;padding-bottom:5px}
+.conversation-history button{flex:0 0 auto;max-width:190px;padding:8px 10px;border:1px solid rgba(111,190,220,.16);border-radius:8px;background:rgba(3,11,19,.55);color:#9eb9c8;font-size:9px;cursor:pointer;text-align:left}
+.conversation-history button.active{border-color:rgba(112,228,244,.55);color:#dffaff;background:rgba(34,93,116,.28)}
+.conversation-history small{display:block;margin-top:4px;color:#668596;font-size:8px}
+.conversation-history .new-conversation-button{color:#8ceaf4;border-style:dashed}
