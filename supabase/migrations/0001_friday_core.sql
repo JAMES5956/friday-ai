@@ -39,7 +39,7 @@ create table if not exists public.memories (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   category text not null default 'general',
-  content text not null check (char_length(content) <= 10000),
+  content text not null check (char_length(content) <= 20000),
   source text not null default 'owner',
   confidence numeric(4,3) not null default 1.000 check (confidence between 0 and 1),
   retained boolean not null default true,
