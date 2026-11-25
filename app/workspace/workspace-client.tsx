@@ -21,6 +21,7 @@ type SpeechWindow = Window & {
 
 type ChatItem = { role: "user" | "assistant"; content: string };
 type MemoryItem = { id: string; category: string; content: string; created_at: string };
+type SecurityEvent = { id: string; event_type: string; severity: string; created_at: string };
 
 export default function WorkspaceClient() {
   const [messages, setMessages] = useState<ChatItem[]>([]);
@@ -32,6 +33,7 @@ export default function WorkspaceClient() {
   const [memories, setMemories] = useState<MemoryItem[]>([]);
   const [memoryDraft, setMemoryDraft] = useState("");
   const [memoryBusy, setMemoryBusy] = useState(false);
+  const [securityEvents, setSecurityEvents] = useState<SecurityEvent[]>([]);
   const [listening, setListening] = useState(false);
 
   function startVoiceInput() {
@@ -90,7 +92,17 @@ export default function WorkspaceClient() {
     }
   }
 
-  useEffect(() => { void loadMemories(); }, []);
+  async function loadSecurityEvents() {
+    try {
+      const response = await fetch("/api/security/events", { cache: "no-store" });
+      const payload = await response.json();
+      if (response.ok) setSecurityEvents(payload.events ?? []);
+    } catch {
+      // Keep the workspace usable if the audit feed is temporarily unavailable.
+    }
+  }
+
+  useEffect(() => { void loadMemories(); void loadSecurityEvents(); }, []);
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -167,6 +179,7 @@ export default function WorkspaceClient() {
   }
 
   return (
+    <>
     <div className="workspace-content">
       <section className="workspace-chat">
         <div className="workspace-section-heading">
@@ -220,5 +233,17 @@ export default function WorkspaceClient() {
         </div>
       </aside>
     </div>
+    <section className="nexus-audit-panel">
+      <div className="workspace-section-heading">
+        <div><ShieldCheck /><div><h2>NEXUS security activity</h2><p>Recent owner-scoped security events</p></div></div>
+        <button className="icon-button" onClick={() => void loadSecurityEvents()} aria-label="Refresh security events"><RefreshCw size={15} /></button>
+      </div>
+      <div className="nexus-event-list">
+        {securityEvents.length === 0
+          ? <p className="memory-empty">No security events recorded yet.</p>
+          : securityEvents.map(event => <article className="nexus-event" key={event.id}><span className={`event-severity ${event.severity}`}>{event.severity}</span><strong>{event.event_type.replaceAll("_", " ")}</strong><time>{new Date(event.created_at).toLocaleString()}</time></article>)}
+      </div>
+    </section>
+    </>
   );
 }
