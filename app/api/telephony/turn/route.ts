@@ -43,6 +43,9 @@ export async function POST(request: Request) {
 
   const speech = (params.get("SpeechResult") ?? "").trim().slice(0, 700);
   const encryptedState = new URL(request.url).searchParams.get("state");
+  if (encryptedState && encryptedState.length > 7_000) {
+    return xmlError("I'm sorry, I can't continue this call securely. Please call again.");
+  }
   if (!speech) {
     const actionUrl = new URL(buildPublicUrl(config, "/api/telephony/turn"));
     if (encryptedState) actionUrl.searchParams.set("state", encryptedState);
