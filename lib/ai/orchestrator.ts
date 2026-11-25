@@ -1,4 +1,4 @@
-import type { ChatMessage } from "@/lib/ai/provider";
+import type { ChatMessage } from "./provider";
 
 const FRIDAY_SYSTEM_PROMPT = `You are FRIDAY, Victor's private personal AI assistant.
 Address Victor as "Boss", "Victor", or "Victor, sir" naturally. Be warm, capable,
