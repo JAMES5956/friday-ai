@@ -3,7 +3,15 @@ import { createClient } from "@/lib/supabase/server";
 import { getOwnerSession } from "@/lib/auth/owner";
 import { decryptPrivateData, encryptPrivateData } from "@/lib/security/encryption";
 
-async function getDatabaseClient() {\n  try {\n    return await createClient();\n  } catch {\n    return null;\n  }\n}\n\nasync function requireOwner() {
+async function getDatabaseClient() {
+  try {
+    return await createClient();
+  } catch {
+    return null;
+  }
+}
+
+async function requireOwner() {
   try {
     const owner = await getOwnerSession();
     return owner.user
@@ -24,7 +32,8 @@ export async function GET() {
     return NextResponse.json({ error: "Private memory encryption is not configured." }, { status: 503 });
   }
 
-  const supabase = await getDatabaseClient();\n  if (!supabase) return NextResponse.json({ error: "Private database access is not configured." }, { status: 503 });
+  const supabase = await getDatabaseClient();
+  if (!supabase) return NextResponse.json({ error: "Private database access is not configured." }, { status: 503 });
   const { data, error } = await supabase
     .from("memories")
     .select("id, category, content, source, confidence, retained, created_at, updated_at")
