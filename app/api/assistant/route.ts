@@ -75,27 +75,6 @@ export async function POST(request: Request) {
     return fail("DATABASE_NOT_CONFIGURED", "Private database access is not configured.", 503);
   }
 
-  const nexusDecision = evaluateRequestForApproval(payload.message);
-  if (!nexusDecision.allowed) {
-    // The block remains effective even if audit storage is temporarily unavailable.
-    await supabase.from("security_audit_events").insert({
-      user_id: owner.user.id,
-      event_type: "assistant_request_blocked",
-      severity: "warning",
-      details: { reason: nexusDecision.reason }
-    });
-    return NextResponse.json(
-      {
-        error: {
-          code: "OWNER_APPROVAL_REQUIRED",
-          message: "This request could have an external or irreversible effect. It needs a separate approval workflow before FRIDAY can act."
-        },
-        requiresApproval: true
-      },
-      { status: 409, headers: { "Cache-Control": "no-store" } }
-    );
-  }
-
   try {
     encryptPrivateData("configuration-check");
   } catch {
@@ -122,6 +101,27 @@ export async function POST(request: Request) {
       details: { source: "assistant_api" }
     });
     return fail("RATE_LIMITED", "Too many requests. Wait a minute before trying again.", 429);
+  }
+
+  const nexusDecision = evaluateRequestForApproval(payload.message);
+  if (!nexusDecision.allowed) {
+    // The block remains effective even if audit storage is temporarily unavailable.
+    await supabase.from("security_audit_events").insert({
+      user_id: owner.user.id,
+      event_type: "assistant_request_blocked",
+      severity: "warning",
+      details: { reason: nexusDecision.reason }
+    });
+    return NextResponse.json(
+      {
+        error: {
+          code: "OWNER_APPROVAL_REQUIRED",
+          message: "This request could have an external or irreversible effect. It needs a separate approval workflow before FRIDAY can act."
+        },
+        requiresApproval: true
+      },
+      { status: 409, headers: { "Cache-Control": "no-store" } }
+    );
   }
 
   let conversationId = payload.conversationId as string | undefined;
