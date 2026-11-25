@@ -26,7 +26,7 @@ export default function TaskCenter() {
     } catch { setStatus("Could not reach the task service."); }
   }, []);
 
-  useEffect(() => { void loadTasks(); }, [loadTasks]);
+  useEffect(() => { void loadTasks(); const refresh = () => { void loadTasks(); }; window.addEventListener("friday:tasks-refresh", refresh); return () => window.removeEventListener("friday:tasks-refresh", refresh); }, [loadTasks]);
 
   async function createTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

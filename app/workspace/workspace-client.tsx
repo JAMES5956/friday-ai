@@ -284,7 +284,8 @@ export default function WorkspaceClient() {
         body: JSON.stringify({ agentId: specialistRecommendation.agentId, title: `Assist with: ${lastUserRequest.slice(0, 135)}`, description: lastUserRequest }) });
       const payload = await response.json();
       if (!response.ok) { setStatus(payload.error?.message ?? "Could not prepare the specialist handoff."); return; }
-      setStatus(payload.message ?? "Task saved. Specialist execution is not enabled yet.");
+      setStatus(payload.message ?? "Task saved to the specialist queue. Review it in Delegation & task control.");
+      window.dispatchEvent(new Event("friday:tasks-refresh"));
     } catch { setStatus("Could not reach the specialist task service."); }
     finally { setHandoffBusy(false); }
   }
