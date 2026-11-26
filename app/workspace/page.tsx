@@ -7,6 +7,7 @@ import WorkspaceClient from "@/app/workspace/workspace-client";
 import TaskCenter from "@/app/workspace/task-center";
 import AgentMemoryPanel from "@/app/workspace/agent-memory";
 import KnowledgeArchive from "@/app/workspace/knowledge-archive";
+import ProjectsPanel from "@/app/workspace/projects";
 import { specialistAgents } from "@/lib/agents/registry";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,7 @@ export default async function WorkspacePage() {
       <TaskCenter />
       <AgentMemoryPanel />
       <KnowledgeArchive />
+      <ProjectsPanel />
       <WorkspaceClient />
       <section className="agent-section">
         <div className="workspace-section-heading"><div><Users /><div><h2>Specialist network</h2><p>Central orchestration with dedicated domains</p></div></div></div>

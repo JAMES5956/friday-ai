@@ -38,11 +38,18 @@ export default function ProjectsPanel() {
 
   const activeProjects = useMemo(() => projects.filter(project => project.payload.status !== "archived"), [projects]);
 
-  function parsePlanLines(value: string, kind: "milestone" | "task") {
+  function parseMilestones(value: string): ProjectPayload["milestones"] {
     return value.split("\n").map(line => line.trim()).filter(Boolean).map(line => {
       const [titlePart, datePart] = line.split("|").map(part => part.trim());
-      const date = datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart) ? datePart : null;
-      return { id: uid(), title: titlePart.slice(0, 180), dueDate: date, status: "pending" as const, ...(kind === "milestone" ? { tasks: [] } : {}) };
+      const dueDate = datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart) ? datePart : null;
+      return { id: uid(), title: titlePart.slice(0, 180), dueDate, status: "pending" as const, tasks: [] };
+    });
+  }
+  function parseTasks(value: string): ProjectPayload["tasks"] {
+    return value.split("\n").map(line => line.trim()).filter(Boolean).map(line => {
+      const [titlePart, datePart] = line.split("|").map(part => part.trim());
+      const dueDate = datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart) ? datePart : null;
+      return { id: uid(), title: titlePart.slice(0, 180), dueDate, status: "pending" as const };
     });
   }
 
@@ -52,8 +59,8 @@ export default function ProjectsPanel() {
     setBusy(true); setNotice("");
     const payload: ProjectPayload = {
       ...draft,
-      milestones: parsePlanLines(milestoneLines, "milestone"),
-      tasks: parsePlanLines(taskLines, "task")
+      milestones: parseMilestones(milestoneLines),
+      tasks: parseTasks(taskLines)
     };
     try {
       const response = await fetch("/api/projects", {

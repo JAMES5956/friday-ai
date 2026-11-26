@@ -6,7 +6,7 @@ import { validateProjectPayload } from "@/lib/projects/policy";
 
 export const dynamic = "force-dynamic";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
-const MAX_BODY_BYTES = 120_000;
+const MAX_BODY_BYTES = 70_000;
 
 function fail(code: string, message: string, status: number) {
   return NextResponse.json({ error: { code, message } }, { status, headers: { "Cache-Control": "no-store" } });
