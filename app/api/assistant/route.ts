@@ -349,8 +349,9 @@ export async function POST(request: Request) {
       ...(history ?? []).slice().reverse().map(item => ({
         role: item.role as "user" | "assistant",
         content: (() => {
-          if (item.integrity_digest !== null && (item.integrity_version !== 1 ||
-              !verifyMemoryIntegrityDigest(owner.user!.id, item.id, item.content, item.integrity_digest, "message"))) throw new Error("Message integrity mismatch");
+          if (item.integrity_digest === null && item.integrity_version === null) throw new Error("Legacy conversation message requires review");
+          if (item.integrity_version !== 1 || typeof item.integrity_digest !== "string" ||
+              !verifyMemoryIntegrityDigest(owner.user!.id, item.id, item.content, item.integrity_digest, "message")) throw new Error("Message integrity mismatch");
           return decryptPrivateData(item.content);
         })()
       })),
