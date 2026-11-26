@@ -26,7 +26,7 @@ export function isRecordStatus(value: unknown): value is KnowledgeRecordStatus {
 export function isSensitivity(value: unknown): value is KnowledgeSensitivity {
   return typeof value === "string" && KNOWLEDGE_SENSITIVITIES.includes(value as KnowledgeSensitivity);
 }
-export function validateKnowledgePayload(value: unknown): value is KnowledgePayload {
+function isSafeSourceUrl(value: string): boolean {\n  try {\n    const url = new URL(value);\n    return url.protocol === "https:" || url.protocol === "http:";\n  } catch { return false; }\n}\n\nexport function validateKnowledgePayload(value: unknown): value is KnowledgePayload {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const item = value as Record<string, unknown>;
   if (typeof item.title !== "string" || !item.title.trim() || item.title.length > 180) return false;
@@ -39,7 +39,7 @@ export function validateKnowledgePayload(value: unknown): value is KnowledgePayl
     if (!source || typeof source !== "object" || Array.isArray(source)) return true;
     const entry = source as Record<string, unknown>;
     return typeof entry.label !== "string" || !entry.label.trim() || entry.label.length > 160 ||
-      (entry.url !== undefined && (typeof entry.url !== "string" || entry.url.length > 2048)) ||
+      (entry.url !== undefined && (typeof entry.url !== "string" || entry.url.length > 2048 || !isSafeSourceUrl(entry.url))) ||
       (entry.accessedAt !== undefined && (typeof entry.accessedAt !== "string" || entry.accessedAt.length > 40));
   }))) return false;
   if (item.confidence !== undefined && (typeof item.confidence !== "number" || !Number.isFinite(item.confidence) || item.confidence < 0 || item.confidence > 1)) return false;
