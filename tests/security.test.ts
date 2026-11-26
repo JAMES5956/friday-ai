@@ -88,6 +88,9 @@ describe("NEXUS approval gate", () => {
     expect(evaluateRequestForApproval("Record this call").requiresApproval).toBe(true);
     expect(evaluateRequestForApproval("Install this application").requiresApproval).toBe(true);
     expect(evaluateRequestForApproval("Overwrite the backup").requiresApproval).toBe(true);
+    expect(evaluateRequestForApproval("I want to get my phone locked").requiresApproval).toBe(true);
+    expect(evaluateRequestForApproval("Please make sure location tracking is disabled").requiresApproval).toBe(true);
+    expect(evaluateRequestForApproval("Can you ensure the backup is restored").requiresApproval).toBe(true);
   });
 
   it("checks task titles as well as descriptions before queueing", () => {
