@@ -17,7 +17,7 @@ The repository now contains:
 - Owner-triggered specialist execution through dedicated per-agent model configuration, encrypted task results, task-event auditing and isolated private working memory.
 - Owner-controlled specialist memory management, expiring cross-agent sharing grants, revocation, and restricted-memory exclusion.
 - Owner memory sensitivity labels, optional retention expiry, provenance references and strict exclusion of restricted or expired memories from model context.
-- Encrypted owner-only knowledge archive and decision journal API with source citations, rationale, confidence, project tags, retention, status lifecycle and owner-controlled archival/deletion.
+- Encrypted owner-only knowledge archive and decision journal with workspace capture, server-side search, source citations, rationale, retention, status lifecycle and owner-controlled archival/deletion. Up to five active routine/internal records can be explicitly selected for one FRIDAY message; restricted, expired and archived records are excluded.
 - FRIDAY can review completed specialist outputs, challenge assumptions and save its synthesis into the owner conversation history.
 - Automated lint, TypeScript and production-build checks.
 
