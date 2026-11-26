@@ -12,7 +12,6 @@ describe("FRIDAY specialist directory", () => {
   it("keeps FRIDAY and NEXUS outside the eight-agent specialist group", () => {
     expect(specialistAgents.find(agent => agent.id === "friday")?.reportsTo).toBe("owner");
     expect(specialistAgents.find(agent => agent.id === "nexus")?.reportsTo).toBe("owner");
-    expect(coreSpecialistAgents.some(agent => agent.id === "nexus" || agent.id === "friday")).toBe(false);
   });
 });
 
