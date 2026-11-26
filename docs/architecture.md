@@ -14,7 +14,7 @@ The application is not deployed. Voice is browser-based and foreground-only; tel
 - **FRIDAY orchestrator:** central assistant identity, conversation context construction, model routing and response synthesis.
 - **Model adapter:** OpenAI-compatible chat-completions interface using server-only provider configuration and bounded request timeouts.
 - **NEXUS policy boundary:** independent deterministic policy gate for sensitive or potentially irreversible requests, approval checks and security audit events. This is an initial security control, not yet a fully independent always-on security service.
-- **Memory service:** owner-scoped PostgreSQL records for conversations, messages, memories, agent workspaces, specialist tasks, sharing grants and append-only task events.
+- **Memory and knowledge service:** owner-scoped PostgreSQL records for conversations, messages, memories, agent workspaces, specialist tasks, sharing grants, append-only task events, and an encrypted knowledge/decision archive. Owner memories support routine, internal and restricted sensitivity, optional expiry and provenance references; restricted and expired memories are excluded from AI model context. Knowledge and decision payloads (including titles, rationale, tags and source references) are encrypted as one application-layer payload. The archive currently supports owner-managed capture, listing, superseding, archiving, deletion and owner-only search. Search decrypts records server-side after owner authentication and never exposes plaintext archive fields to database search indexes. Model context is opt-in per message: the owner may explicitly select up to five active routine/internal records for the next FRIDAY message. Restricted, expired and archived records are never eligible, and selected records are not reused automatically.
 - **Data encryption:** AES-256-GCM application-layer encryption for stored private conversation, memory, task and result content. The encryption key is separate from the database.
 - **Specialist workflow:** registered specialist roles, per-agent model configuration, owner-created tasks, NEXUS approval checks, explicit owner-triggered execution, isolated agent memory and owner-approved expiring cross-agent memory grants. Specialist workers return text only and have no tools or external-action capability.
 - **Quality controls:** automated lint, TypeScript, test and production-build checks in GitHub Actions.
@@ -32,7 +32,7 @@ The application is not deployed. Voice is browser-based and foreground-only; tel
 
 ## Data protection
 
-1. Conversation, memory, task and result text is encrypted in the application before database writes.
+1. Conversation, memory, task, result and knowledge/decision payloads are encrypted in the application before database writes.
 2. AES-256-GCM uses a fresh 12-byte random nonce and authentication tag for each encrypted value.
 3. FRIDAY_DATA_ENCRYPTION_KEY must be a base64-encoded 32-byte key.
 4. Losing the encryption key makes encrypted content unrecoverable. Keep a secure offline backup; never commit it or store it in the database.

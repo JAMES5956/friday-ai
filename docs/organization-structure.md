@@ -9,84 +9,88 @@ FRIDAY is the central intelligence and executive coordinator. The owner retains 
 ## Governance and reporting
 
 ```text
-Owner (Victor)
+Owner (Boss)
 ├── FRIDAY — CEO and central intelligence
-│   ├── Strategy and Planning — ATLAS
-│   ├── Research and Intelligence — ORACLE
-│   ├── Engineering and R&D — FORGE
-│   ├── Technology — BYTE
-│   ├── Finance — VANTAGE
-│   ├── Legal and Compliance — SAGE
-│   ├── Creative and Communications — PIXEL
-│   ├── Business Development — SCOUT
-│   ├── Quality — VIGOR
-│   ├── Testing — PROBE and STRESS
-│   ├── Release Governance — AEGIS
-│   └── Operations and Observability — METRIC
+│   ├── ATLAS — Strategy and Operations
+│   ├── ORACLE — Research and Intelligence
+│   ├── FORGE — Engineering and R&D
+│   ├── BYTE — Technology, Software and Programming
+│   ├── VANTAGE — Finance and Business
+│   │   ├── Accounting Department
+│   │   └── Trading Department
+│   ├── SAGE — Education and Learning
+│   ├── PIXEL — Creative Studio
+│   └── SCOUT — Opportunities and Discovery
 └── NEXUS — Independent Security and Privacy Guardian
-    └── Direct escalation to Owner; independent of FRIDAY's
-        ordinary specialist reporting chain
+    └── Direct reporting to Boss; outside FRIDAY's ordinary
+        specialist management chain
 ```
 
-NEXUS may review security-relevant work across the organisation and raise concerns directly to the owner. It is not subordinate to FRIDAY and is not an ordinary departmental specialist.
+There are exactly eight core specialist agents: ATLAS, ORACLE, FORGE, BYTE, VANTAGE, SAGE, PIXEL and SCOUT. FRIDAY is the central intelligence and executive coordinator, not one of the eight. NEXUS is an independent security authority, not one of the eight.
+
+Quality assurance, testing, release governance, legal/compliance support, manufacturing and observability are organisational functions. They do not create additional specialist-agent identities. FRIDAY coordinates those functions using the relevant core specialists and authorised tools; NEXUS independently reviews security and privacy matters.
 
 ## Department mandates
 
 | Department | Lead | Primary mandate |
 |---|---|---|
 | Executive | FRIDAY | Translate owner direction into plans, coordinate work, delegate tasks, review results and report progress. |
-| Strategy and Planning | ATLAS | Strategic options, priorities, roadmaps, milestones and risk analysis. |
-| Research and Intelligence | ORACLE | Evidence gathering, source assessment, fact checking and research summaries. |
-| Engineering and R&D | FORGE | Technical design, prototypes, engineering plans and research initiatives. |
-| Technology | BYTE | Software, infrastructure, AI systems, technical support and automation design. |
-| Finance | VANTAGE | Budgets, cost analysis, financial scenarios and management reporting. |
-| Legal and Compliance | SAGE | Legal-information research, compliance checklists and issue spotting for qualified review. |
-| Creative and Communications | PIXEL | Creative direction, brand materials, content and communication drafts. |
-| Business Development | SCOUT | Opportunity discovery, partnership research, lead assessment and growth proposals. |
-| Quality | VIGOR | Quality standards, acceptance criteria, reviews and defect classification. |
-| Testing | PROBE and STRESS | Authorised functional/security testing and performance/resilience testing within approved limits. |
-| Release Governance | AEGIS | Release readiness, change-risk assessment and rollback recommendations. |
-| Operations and Observability | METRIC | Operational measures, trend analysis, reliability indicators and reporting. |
+| Strategy and Operations | ATLAS | Strategy, priorities, operational plans, milestones, resource proposals and risk analysis. |
+| Research and Intelligence | ORACLE | Evidence gathering, source assessment, fact checking, scientific and market research. |
+| Engineering and R&D | FORGE | Engineering design, hardware, robotics, prototypes and research initiatives. |
+| Technology and Software | BYTE | Software, programming, AI integrations, infrastructure, APIs and automation. |
+| Finance and Business | VANTAGE | Financial planning, commercial analysis, budgets and corporate reporting. |
+| Accounting | VANTAGE | Bookkeeping, reconciliations, financial statements, audit preparation and tax research. |
+| Trading | VANTAGE | Market research, trading analysis, risk management and investment evaluation. Trading execution requires explicit owner approval. |
+| Education and Learning | SAGE | Mathematics, science, tutoring, exam preparation, academic research and learning materials. |
+| Creative Studio | PIXEL | Creative direction, branding, media, presentations and communication drafts. |
+| Opportunities and Discovery | SCOUT | Scholarships, grants, careers, partnerships, emerging markets and opportunity research. |
+| Legal and Compliance Support | FRIDAY-coordinated | General legal-information research and issue spotting; qualified human review where required. |
+| Quality Assurance | FRIDAY-coordinated | Acceptance criteria, independent quality checks and defect tracking. |
+| Testing and Reliability | BYTE / FORGE with NEXUS oversight | Authorised functional, security and resilience testing within approved limits. |
+| Release Governance | FRIDAY with NEXUS review | Release readiness, change-risk assessment and rollback recommendations. |
+| Operations and Observability | FRIDAY-coordinated | Operational measures, workload management, reliability indicators and reporting. |
+| Manufacturing and Prototyping | FORGE | Physical product planning, safe prototype workflows and manufacturing coordination. |
 | Independent Security | NEXUS | Privacy, security oversight, system integrity, incident escalation and recovery assurance. |
 
 ## Standard work and reporting cycle
 
-1. **Owner direction:** The owner sets the goal, constraints and any approval boundaries.
+1. **Owner direction:** Boss sets the goal, constraints and approval boundaries.
 2. **Executive intake:** FRIDAY clarifies the desired outcome, identifies risks and breaks suitable work into tasks.
 3. **Assignment:** FRIDAY assigns work to the relevant specialist. Cross-department work may have one coordinating lead and named contributors.
 4. **Execution:** Specialists work within their configured capabilities, granted data and approved scope. A planned agent must not be represented as operational.
-5. **Quality and security review:** VIGOR or the relevant testing/release function reviews quality where appropriate. NEXUS independently reviews security and privacy risks.
-6. **Executive synthesis:** FRIDAY checks the returned work, highlights uncertainty and conflicts, and prepares a concise result for the owner.
-7. **Owner decision:** The owner approves external commitments, spending, publication, sensitive disclosure, production changes and other consequential actions.
-8. **Record keeping:** Decisions, task status, approvals, risks and outcomes should be recorded in the authorised project audit/workspace systems when those systems are implemented.
+5. **Quality and security review:** FRIDAY coordinates appropriate quality checks. NEXUS independently reviews security and privacy risks.
+6. **Executive synthesis:** FRIDAY checks returned work, highlights uncertainty and conflicts, and prepares a concise result for Boss.
+7. **Owner decision:** Boss approves external commitments, spending, publication, sensitive disclosure, production changes and other consequential actions.
+8. **Record keeping:** Decisions, task status, approvals, risks and outcomes are recorded in authorised project systems when implemented.
 
 ## Meeting and reporting rhythm
 
-The intended cadence is:
-
-- **Daily executive briefing:** FRIDAY presents priorities, schedule, deadlines, risks and items requiring the owner's decision.
-- **Department check-ins:** Department leads report progress, blockers, upcoming work and dependencies when there is active work to review.
+- **Daily executive briefing:** FRIDAY presents priorities, schedule, deadlines, risks and items requiring Boss's decision.
+- **Department check-ins:** Relevant leads report progress, blockers, upcoming work and dependencies when there is active work to review.
 - **Project reviews:** Relevant departments meet around milestones, deliverables and risks.
-- **Security reviews:** NEXUS reports material security concerns directly to the owner and may request an immediate review.
+- **R&D and manufacturing reviews:** FORGE coordinates design, prototype, safety and manufacturing discussions when active work requires them.
+- **Quality and release reviews:** FRIDAY coordinates checks before changes are proposed for release.
+- **Security reviews:** NEXUS reports material security concerns directly to Boss and may request an immediate review.
 - **Weekly executive review:** FRIDAY consolidates departmental progress, resource needs, unresolved decisions and next-week priorities.
 
-Meetings must be scheduled only when there is actual work, participants and a defined purpose. This document does not create calendar events or claim that meetings are currently running.
+Meetings must be scheduled only when there is actual work, participants and a defined purpose. The 8:00 AM Kenya-time daily briefing is an approved design requirement; actual cellular calls depend on separately configured and approved telephony and calendar integrations.
 
 ## Decision rights and safety boundaries
 
-- The owner has final authority over corporate direction and consequential decisions.
+- Boss has final authority over corporate direction and consequential decisions.
 - FRIDAY coordinates and recommends; it does not silently make external commitments.
-- Department agents provide analysis and deliverables within their assigned remit.
-- No agent may spend money, sign agreements, contact external parties, publish content, disclose private information or change production systems without the required explicit owner authorisation.
-- NEXUS may independently flag, block or escalate security-sensitive activity according to the implemented security controls.
+- Specialists may analyse, research, draft, calculate and perform approved-scope work.
+- No agent may spend money, execute trades, sign agreements, contact external parties, publish content, disclose private information or change production systems without the required explicit owner authorisation.
+- NEXUS independently flags, blocks or escalates security-sensitive activity within its implemented controls.
 - Legal, financial and other regulated matters require appropriately qualified human professionals where applicable.
-- Agents must distinguish verified facts, assumptions, estimates and recommendations.
-- Reporting must state when a department, integration, monitoring feed or capability is planned, unavailable or not yet configured.
+- Agents distinguish verified facts, assumptions, estimates and recommendations.
+- Reporting states when a department, integration, monitoring feed or capability is planned, unavailable or not yet configured.
 
 ## Implementation sequence
 
-1. Finalise and review this organisational blueprint.
-2. Configure specialist agent prompts, dedicated model settings and access boundaries.
+1. Maintain the eight-agent core registry and independent NEXUS authority.
+2. Configure specialist instructions, dedicated model settings and access boundaries.
 3. Build department-level work queues, project tracking and reporting.
 4. Add approved calendar, document and communication integrations only when authorised.
 5. Test cross-department handoffs, quality checks, NEXUS oversight and owner approval gates.

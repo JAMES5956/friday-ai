@@ -16,6 +16,8 @@ The repository now contains:
 - Central specialist recommendation and explicit owner-controlled task handoff.
 - Owner-triggered specialist execution through dedicated per-agent model configuration, encrypted task results, task-event auditing and isolated private working memory.
 - Owner-controlled specialist memory management, expiring cross-agent sharing grants, revocation, and restricted-memory exclusion.
+- Owner memory sensitivity labels, optional retention expiry, provenance references and strict exclusion of restricted or expired memories from model context.
+- Encrypted owner-only knowledge archive and decision journal with workspace capture, server-side search, source citations, rationale, retention, status lifecycle and owner-controlled archival/deletion. Up to five active routine/internal records can be explicitly selected for one FRIDAY message; restricted, expired and archived records are excluded.
 - FRIDAY can review completed specialist outputs, challenge assumptions and save its synthesis into the owner conversation history.
 - Automated lint, TypeScript and production-build checks.
 
@@ -52,7 +54,7 @@ Requirements: Node.js 20.9+ and npm.
 3. In Supabase Authentication, enable email/password sign-in and disable public sign-ups.
 4. Create the owner account manually in the Supabase dashboard.
 5. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `FRIDAY_OWNER_EMAIL`.
-6. Run the SQL migrations in order: `0001_friday_core.sql`, `0002_nexus_rate_limits.sql`, `0003_agent_workspaces.sql`, `0004_task_approval_workflow.sql`, and `0005_agent_memory_grant_guards.sql`.
+6. Run the SQL migrations in order: `0001_friday_core.sql`, `0002_nexus_rate_limits.sql`, `0003_agent_workspaces.sql`, `0004_task_approval_workflow.sql`, `0005_agent_memory_grant_guards.sql`, `0006_memory_lifecycle.sql`, and `0007_knowledge_decision_archive.sql`.
 7. Generate an application encryption key locally with `openssl rand -base64 32` and set `FRIDAY_DATA_ENCRYPTION_KEY`. Keep a secure offline backup of this key. Losing it makes encrypted stored data unrecoverable.
 8. Configure `AI_BASE_URL`, `AI_MODEL`, and `AI_API_KEY` only after choosing and approving a model provider. The API key is server-only and must never use a `NEXT_PUBLIC_` prefix.
 9. To enable a specialist, also set its dedicated model variable (for example `AI_ORACLE_MODEL` or `AI_FORGE_MODEL`). Specialist execution deliberately has no fallback to `AI_MODEL`; each delegated agent must have its own configured model. All configured models use the shared server-side provider URL and key.
@@ -82,7 +84,7 @@ GitHub Actions runs the same checks for commits to `main` and `foundation/**` br
 - Never commit real keys, passwords, tokens, private keys or recovery codes.
 - The owner email allowlist is enforced server-side; public registration is not part of the application.
 - Database tables use row-level security so authenticated users can only access rows belonging to their own auth user ID.
-- Conversation and memory content is encrypted before it is written to PostgreSQL. Keep the encryption key separate from the database and back it up securely.
+- Conversation, memory, task, result and knowledge/decision payloads are encrypted before they are written to PostgreSQL. Keep the encryption key separate from the database and back it up securely.
 - If the encryption key is missing or invalid, private storage endpoints fail closed.
 - The assistant route does not execute external actions. Sensitive or potentially irreversible delegated tasks remain blocked until the owner records approval in the task workflow.
 - A model provider must be configured before FRIDAY can generate responses.

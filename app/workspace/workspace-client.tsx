@@ -22,7 +22,7 @@ type SpeechWindow = Window & {
 
 type ChatItem = { role: "user" | "assistant"; content: string };
 type ConversationItem = { id: string; title: string; updated_at: string };
-type MemoryItem = { id: string; category: string; content: string; created_at: string };
+type MemoryItem = { id: string; category: string; content: string; sensitivity: "routine" | "internal" | "restricted"; expires_at: string | null; source_reference: string | null; created_at: string };
 type SecurityEvent = { id: string; event_type: string; severity: string; created_at: string };
 type SpecialistRecommendation = { agentId: string; name: string; role: string; confidence: "high" | "moderate"; reason: string };
 
@@ -32,10 +32,13 @@ export default function WorkspaceClient() {
   const [conversationId, setConversationId] = useState<string>();
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [includeMemory, setIncludeMemory] = useState(false);
+  const [knowledgeRecordIds, setKnowledgeRecordIds] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState("");
   const [memories, setMemories] = useState<MemoryItem[]>([]);
   const [memoryDraft, setMemoryDraft] = useState("");
+  const [memorySensitivity, setMemorySensitivity] = useState<"routine" | "internal" | "restricted">("internal");
+  const [memoryExpiry, setMemoryExpiry] = useState("never");
   const [memoryBusy, setMemoryBusy] = useState(false);
   const [securityEvents, setSecurityEvents] = useState<SecurityEvent[]>([]);
   const [listening, setListening] = useState(false);
@@ -238,6 +241,14 @@ export default function WorkspaceClient() {
   useEffect(() => { void loadMemories(); void loadSecurityEvents(); void loadConversations(true); return () => { recognitionRef.current?.stop(); window.speechSynthesis?.cancel(); }; // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
+    const receiveKnowledgeSelection = (event: Event) => {
+      const ids = (event as CustomEvent<string[]>).detail;
+      if (Array.isArray(ids) && ids.length <= 5 && ids.every(id => typeof id === "string")) setKnowledgeRecordIds(ids);
+    };
+    window.addEventListener("friday:knowledge-context", receiveKnowledgeSelection);
+    return () => window.removeEventListener("friday:knowledge-context", receiveKnowledgeSelection);
+  }, []);
+  useEffect(() => {
     const refreshConversations = () => { void loadConversations(); };
     window.addEventListener("friday:conversation-refresh", refreshConversations);
     return () => window.removeEventListener("friday:conversation-refresh", refreshConversations);
@@ -255,13 +266,15 @@ export default function WorkspaceClient() {
       const response = await fetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: content, conversationId, includeMemory })
+        body: JSON.stringify({ message: content, conversationId, includeMemory, knowledgeRecordIds })
       });
       const payload = await response.json();
       if (!response.ok) {
         setStatus(payload.error?.message ?? "FRIDAY could not complete the request.");
         return;
       }
+      setKnowledgeRecordIds([]);
+      window.dispatchEvent(new Event("friday:knowledge-context-cleared"));
       setConversationId(payload.conversationId);
       setModelTier(payload.modelTier);
       setSpecialistRecommendation(payload.specialistRecommendation ?? null);
@@ -320,7 +333,7 @@ export default function WorkspaceClient() {
       const response = await fetch("/api/memory", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, category: "owner_note" })
+        body: JSON.stringify({ content, category: "owner_note", sensitivity: memorySensitivity, expiresInDays: memoryExpiry === "never" ? null : Number(memoryExpiry) })
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -364,6 +377,7 @@ export default function WorkspaceClient() {
           ))}
           {sending && <div className="chat-message assistant"><span>FRIDAY</span><p>Thinking...</p></div>}
         </div>
+        {knowledgeRecordIds.length > 0 && <p className="knowledge-context-status">{knowledgeRecordIds.length} owner-selected archive record{knowledgeRecordIds.length === 1 ? "" : "s"} will be included in your next message. They will not be reused automatically.</p>}
         <label className="memory-context-toggle">
           <input type="checkbox" checked={includeMemory} onChange={event => setIncludeMemory(event.target.checked)} />
           Include my saved memories in this conversation
@@ -406,12 +420,16 @@ export default function WorkspaceClient() {
         </div>
         <form className="memory-form" onSubmit={saveMemory}>
           <textarea value={memoryDraft} onChange={event => setMemoryDraft(event.target.value)} placeholder="Add a fact or note for FRIDAY to retain..." rows={3} maxLength={10000} />
+          <div className="agent-memory-controls">
+            <label>Privacy<select value={memorySensitivity} onChange={event => setMemorySensitivity(event.target.value as typeof memorySensitivity)}><option value="routine">Routine — may be used in context</option><option value="internal">Internal — may be used in context</option><option value="restricted">Restricted — owner only, never sent to AI models</option></select></label>
+            <label>Retention<select value={memoryExpiry} onChange={event => setMemoryExpiry(event.target.value)}><option value="never">Keep until I delete it</option><option value="30">30 days</option><option value="90">90 days</option><option value="365">1 year</option></select></label>
+          </div>
           <button type="submit" disabled={!memoryDraft.trim() || memoryBusy}><Plus size={15} /> Save memory</button>
         </form>
         <div className="memory-list">
           {memories.length === 0
             ? <p className="memory-empty">No saved notes yet. Database configuration is required.</p>
-            : memories.map(memory => <article className="memory-item" key={memory.id}><div className="memory-item-heading"><span>{memory.category}</span><button type="button" onClick={() => void deleteMemory(memory.id)}>Delete</button></div><p>{memory.content}</p></article>)}
+            : memories.map(memory => <article className="memory-item" key={memory.id}><div className="memory-item-heading"><span>{memory.category} · {memory.sensitivity}</span><button type="button" onClick={() => void deleteMemory(memory.id)}>Delete</button></div><p>{memory.content}</p>{memory.expires_at && <small>Expires {new Date(memory.expires_at).toLocaleDateString()}</small>}</article>)}
         </div>
       </aside>
     </div>
