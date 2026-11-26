@@ -36,6 +36,8 @@ export default function KnowledgeArchive() {
   const [sensitivity, setSensitivity] = useState<"routine" | "internal" | "restricted">("internal");
   const [retention, setRetention] = useState("never");
   const [filter, setFilter] = useState<"active" | "superseded" | "archived">("active");
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
@@ -43,7 +45,7 @@ export default function KnowledgeArchive() {
   const loadRecords = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/knowledge?status=" + filter, { cache: "no-store" });
+      const response = await fetch("/api/knowledge?status=" + filter + (searchQuery ? "&q=" + encodeURIComponent(searchQuery) : ""), { cache: "no-store" });
       const payload = await response.json();
       if (!response.ok) {
         setNotice(payload.error ?? "Knowledge archive is unavailable. Database migrations may still be pending.");
@@ -58,7 +60,7 @@ export default function KnowledgeArchive() {
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [filter, searchQuery]);
 
   useEffect(() => { void loadRecords(); }, [loadRecords]);
 
@@ -92,6 +94,7 @@ export default function KnowledgeArchive() {
         return;
       }
       setTitle(""); setBody(""); setRationale(""); setProject(""); setSourceLabel(""); setSourceUrl("");
+      setSearchInput(""); setSearchQuery("");
       setFilter("active");
       setNotice(type === "decision" ? "Decision saved securely." : "Knowledge saved securely.");
       await loadRecords();
@@ -157,6 +160,11 @@ export default function KnowledgeArchive() {
         <button type="submit" disabled={busy || !title.trim() || !body.trim()}><Save size={15} /> {busy ? "Saving..." : "Save encrypted record"}</button>
       </form>
 
+      <form className="knowledge-search" onSubmit={event => { event.preventDefault(); setSearchQuery(searchInput.trim()); }}>
+        <input aria-label="Search archive" value={searchInput} onChange={event => setSearchInput(event.target.value)} maxLength={120} placeholder="Search titles, details, projects and sources..." />
+        <button type="submit">Search</button>
+        {searchQuery && <button type="button" onClick={() => { setSearchInput(""); setSearchQuery(""); }}>Clear</button>}
+      </form>
       <div className="knowledge-archive-toolbar">
         <div className="knowledge-filter" role="group" aria-label="Archive status">
           {(["active", "superseded", "archived"] as const).map(value => <button type="button" key={value} className={filter === value ? "selected" : ""} onClick={() => setFilter(value)}>{value}</button>)}
