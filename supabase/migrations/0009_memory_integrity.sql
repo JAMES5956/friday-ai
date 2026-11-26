@@ -3,7 +3,7 @@
 alter table public.memories
   add column if not exists integrity_digest text,
   add column if not exists integrity_version smallint,
-  add column if not exists integrity_checked_at timestamptz;
+  add column if not exists integrity_sealed_at timestamptz;
 
 alter table public.memories
   drop constraint if exists memories_integrity_digest_format_check;
@@ -21,12 +21,12 @@ alter table public.memories
   );
 
 create index if not exists memories_integrity_review_idx
-  on public.memories(user_id, integrity_checked_at desc)
+  on public.memories(user_id, integrity_sealed_at desc)
   where retained = true;
 
 comment on column public.memories.integrity_digest is
   'HMAC-SHA256 over owner ID, memory ID and ciphertext using a domain-separated key derived from FRIDAY_DATA_ENCRYPTION_KEY. NULL means legacy/unsealed, not verified.';
 comment on column public.memories.integrity_version is
   'Integrity envelope version. Version 1 uses HMAC-SHA256 with domain separation.';
-comment on column public.memories.integrity_checked_at is
-  'Last time NEXUS integrity verification examined this memory. Does not imply that a legacy unsigned record is verified.';
+comment on column public.memories.integrity_sealed_at is
+  'Time the owner explicitly sealed this memory after reviewing its legacy content.';

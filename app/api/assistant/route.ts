@@ -4,7 +4,7 @@ import { getOwnerSession } from "@/lib/auth/owner";
 import { generateAssistantReply } from "@/lib/ai/provider";
 import { buildConversation } from "@/lib/ai/orchestrator";
 import { evaluateRequestForApproval } from "@/lib/security/nexus";
-import { decryptPrivateData, encryptPrivateData } from "@/lib/security/encryption";
+import { decryptPrivateData, encryptPrivateData, verifyMemoryIntegrityDigest } from "@/lib/security/encryption";
 import { recommendSpecialist } from "@/lib/agents/router";
 import { isMemoryAvailableToModel } from "@/lib/memory/policy";
 import { validateProjectPayload } from "@/lib/projects/policy";
@@ -266,14 +266,22 @@ export async function POST(request: Request) {
   if (payload.includeMemory === true) {
     const { data: memoryRows, error: memoryError } = await supabase
       .from("memories")
-      .select("content, sensitivity, expires_at")
+      .select("id, content, sensitivity, expires_at, integrity_digest, integrity_version")
       .eq("user_id", owner.user.id)
       .eq("retained", true)
       .order("updated_at", { ascending: false })
       .limit(25);
     if (memoryError) return fail("MEMORY_STORE_UNAVAILABLE", "Could not load saved memory.", 503);
+    const retainedRows = memoryRows ?? [];
+    const integrityFailure = retainedRows.some(row =>
+      row.integrity_digest !== null &&
+      (row.integrity_version !== 1 || !verifyMemoryIntegrityDigest(owner.user.id, row.id, row.content, row.integrity_digest))
+    );
+    if (integrityFailure) return fail("MEMORY_INTEGRITY_FAILED", "NEXUS detected a saved-memory integrity mismatch. Memory context has been blocked; review the integrity centre.", 503);
     try {
-      savedMemories = (memoryRows ?? []).filter(row => isMemoryAvailableToModel(row.sensitivity, row.expires_at)).map(row => decryptPrivateData(row.content));
+      savedMemories = retainedRows
+        .filter(row => row.integrity_version === 1 && row.integrity_digest && isMemoryAvailableToModel(row.sensitivity, row.expires_at))
+        .map(row => decryptPrivateData(row.content));
     } catch {
       return fail("PRIVATE_DATA_UNREADABLE", "Saved memory could not be decrypted. Check the encryption key.", 503);
     }

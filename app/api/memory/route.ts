@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnerSession } from "@/lib/auth/owner";
-import { createMemoryIntegrityDigest, decryptPrivateData, encryptPrivateData } from "@/lib/security/encryption";
+import { createMemoryIntegrityDigest, decryptPrivateData, encryptPrivateData, verifyMemoryIntegrityDigest } from "@/lib/security/encryption";
 import { getMemoryExpiry, isMemorySensitivity } from "@/lib/memory/policy";
 
 async function getDatabaseClient() {
@@ -38,7 +38,7 @@ export async function GET() {
   if (!supabase) return NextResponse.json({ error: "Private database access is not configured." }, { status: 503 });
   const { data, error } = await supabase
     .from("memories")
-    .select("id, category, content, source, confidence, retained, sensitivity, expires_at, source_reference, last_accessed_at, created_at, updated_at")
+    .select("id, category, content, integrity_digest, integrity_version, source, confidence, retained, sensitivity, expires_at, source_reference, last_accessed_at, created_at, updated_at")
     .eq("user_id", auth.user.id)
     .eq("retained", true)
     .order("updated_at", { ascending: false })
@@ -48,10 +48,16 @@ export async function GET() {
 
   try {
     return NextResponse.json({
-      memories: (data ?? []).map(memory => ({
-        ...memory,
-        content: decryptPrivateData(memory.content)
-      }))
+      memories: (data ?? []).map(memory => {
+        const integrityStatus = memory.integrity_digest === null || memory.integrity_version === null
+          ? "legacy_unsealed"
+          : memory.integrity_version === 1 && verifyMemoryIntegrityDigest(auth.user!.id, memory.id, memory.content, memory.integrity_digest)
+            ? "verified"
+            : "tampered";
+        if (integrityStatus === "tampered") return { ...memory, content: "", integrityStatus };
+        try { return { ...memory, content: decryptPrivateData(memory.content), integrityStatus }; }
+        catch { return { ...memory, content: "", integrityStatus: "unreadable" }; }
+      })
     }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json({ error: "Memory could not be decrypted. Check the encryption key." }, { status: 503 });

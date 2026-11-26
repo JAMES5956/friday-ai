@@ -108,7 +108,7 @@ export async function POST(request: Request) {
         const ciphertext = encryptPrivateData(plaintext);
         const digest = createMemoryIntegrityDigest(context.owner.id, row.id, ciphertext);
         const { data: updated, error: updateError } = await context.supabase.from("memories")
-          .update({ content: ciphertext, integrity_digest: digest, integrity_version: 1, integrity_checked_at: new Date().toISOString() })
+          .update({ content: ciphertext, integrity_digest: digest, integrity_version: 1, integrity_sealed_at: new Date().toISOString() })
           .eq("id", row.id).eq("user_id", context.owner.id).eq("content", row.content)
           .is("integrity_digest", null).select("id").maybeSingle();
         if (updateError || !updated) { skipped++; continue; }
