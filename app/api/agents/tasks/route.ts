@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnerSession } from "@/lib/auth/owner";
-import { encryptPrivateData, decryptPrivateData } from "@/lib/security/encryption";
+import { createMemoryIntegrityDigest, verifyMemoryIntegrityDigest, encryptPrivateData, decryptPrivateData } from "@/lib/security/encryption";
+import { randomUUID } from "node:crypto";
 import { evaluateTaskForApproval } from "@/lib/security/nexus";
 import { specialistAgents, type SpecialistAgentId } from "@/lib/agents/registry";
 import { resolveAgentModelConfig } from "@/lib/agents/runtime";
@@ -19,18 +20,26 @@ export async function GET() {
     if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
     const supabase = await createClient();
     const { data, error } = await supabase.from("agent_tasks")
-      .select("id, assigned_agent_id, created_by_agent_id, title, status, task_ciphertext, result_ciphertext, requires_owner_approval, owner_approved_at, created_at, updated_at")
+      .select("id, assigned_agent_id, created_by_agent_id, title, status, task_ciphertext, result_ciphertext, task_integrity_digest, task_integrity_version, result_integrity_digest, result_integrity_version, requires_owner_approval, owner_approved_at, created_at, updated_at")
       .eq("owner_id", owner.user.id).order("created_at", { ascending: false }).limit(50);
     if (error) return fail("TASK_STORAGE_UNAVAILABLE", "Task storage is unavailable. Apply migrations 0003 and 0004.", 503);
     const tasks = (data ?? []).map(task => {
       let description = "";
       let result: string | null = null;
-      try { description = decryptPrivateData(task.task_ciphertext); } catch { description = "[Encrypted task cannot be read with the current key]"; }
+      const taskIntegrity = task.task_integrity_digest
+        ? task.task_integrity_version === 1 && verifyMemoryIntegrityDigest(owner.user!.id, task.id, task.task_ciphertext, task.task_integrity_digest, "agent_task")
+        : null;
+      try { if (taskIntegrity === false) throw new Error("Task integrity mismatch"); description = decryptPrivateData(task.task_ciphertext); }
+      catch { description = "[Task details failed integrity verification or decryption]"; }
       if (task.result_ciphertext) {
-        try { result = decryptPrivateData(task.result_ciphertext); } catch { result = "[Encrypted result cannot be read with the current key]"; }
+        const resultIntegrity = task.result_integrity_digest
+          ? task.result_integrity_version === 1 && verifyMemoryIntegrityDigest(owner.user!.id, task.id, task.result_ciphertext, task.result_integrity_digest, "agent_task_result")
+          : null;
+        try { if (resultIntegrity === false) throw new Error("Task result integrity mismatch"); result = decryptPrivateData(task.result_ciphertext); }
+        catch { result = "[Task result failed integrity verification or decryption]"; }
       }
-      const { task_ciphertext: _task, result_ciphertext: _result, ...safe } = task;
-      return { ...safe, description, result };
+      const { task_ciphertext: _task, result_ciphertext: _result, task_integrity_digest: _td, task_integrity_version: _tv, result_integrity_digest: _rd, result_integrity_version: _rv, ...safe } = task;
+      return { ...safe, description, result, integrityStatus: taskIntegrity === null ? "legacy_unsealed" : taskIntegrity ? "verified" : "tampered" };
     });
     return NextResponse.json({ tasks, executionEnabled: true, configuredAgents: specialistAgents.filter(agent => agent.id !== "friday" && agent.id !== "nexus" && resolveAgentModelConfig(agent.id)).map(agent => agent.id) }, { headers: { "Cache-Control": "no-store" } });
   } catch {
@@ -63,22 +72,29 @@ export async function POST(request: Request) {
     if (!withinLimit) return fail("RATE_LIMITED", "Too many task submissions. Wait before trying again.", 429);
     const decision = evaluateTaskForApproval(input.title, input.description);
     const status = decision.requiresApproval ? "awaiting_approval" : "queued";
+    const taskId = randomUUID();
     const taskCiphertext = encryptPrivateData(input.description.trim());
     const { data, error } = await supabase.from("agent_tasks").insert({
-      owner_id: owner.user.id,
+      id: taskId, owner_id: owner.user.id,
       assigned_agent_id: input.agentId,
       created_by_agent_id: "friday",
       title: input.title.trim(),
       status,
       task_ciphertext: taskCiphertext,
+      task_integrity_digest: createMemoryIntegrityDigest(owner.user.id, taskId, taskCiphertext, "agent_task"),
+      task_integrity_version: 1,
       requires_owner_approval: decision.requiresApproval
     }).select("id, assigned_agent_id, title, status, requires_owner_approval, created_at").single();
     if (error || !data) return fail("TASK_CREATE_FAILED", "Could not save this task. Confirm migrations 0003 and 0004 are applied and encryption is configured.", 503);
 
     const eventType = decision.requiresApproval ? "owner_approval_required" : "task_queued";
+    const eventId = randomUUID();
+    const eventCiphertext = encryptPrivateData(JSON.stringify({ assignedAgentId: input.agentId, approvalRequired: decision.requiresApproval }));
     const { error: eventError } = await supabase.from("agent_task_events").insert({
-      owner_id: owner.user.id, task_id: data.id, actor_agent_id: "friday", event_type: eventType,
-      details_ciphertext: encryptPrivateData(JSON.stringify({ assignedAgentId: input.agentId, approvalRequired: decision.requiresApproval }))
+      id: eventId, owner_id: owner.user.id, task_id: data.id, actor_agent_id: "friday", event_type: eventType,
+      details_ciphertext: eventCiphertext,
+      details_integrity_digest: createMemoryIntegrityDigest(owner.user.id, eventId, eventCiphertext, "agent_task_event"),
+      details_integrity_version: 1
     });
     if (eventError) {
       await supabase.from("agent_tasks").delete().eq("id", data.id).eq("owner_id", owner.user.id);
