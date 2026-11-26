@@ -27,12 +27,12 @@ alter table public.agent_tasks add constraint agent_tasks_task_integrity_check
     (task_integrity_digest is not null and length(task_integrity_digest) = 64 and task_integrity_digest !~ '[^a-f0-9]' and task_integrity_version = 1));
 alter table public.agent_tasks drop constraint if exists agent_tasks_result_integrity_check;
 alter table public.agent_tasks add constraint agent_tasks_result_integrity_check
-  check ((result_ciphertext is null and result_integrity_digest is null and result_integrity_version is null) or
+  check ((result_integrity_digest is null and result_integrity_version is null) or
     (result_ciphertext is not null and result_integrity_digest is not null and length(result_integrity_digest) = 64 and result_integrity_digest !~ '[^a-f0-9]' and result_integrity_version = 1));
 
 alter table public.agent_task_events drop constraint if exists agent_task_events_details_integrity_check;
 alter table public.agent_task_events add constraint agent_task_events_details_integrity_check
-  check ((details_ciphertext is null and details_integrity_digest is null and details_integrity_version is null) or
+  check ((details_integrity_digest is null and details_integrity_version is null) or
     (details_ciphertext is not null and details_integrity_digest is not null and length(details_integrity_digest) = 64 and details_integrity_digest !~ '[^a-f0-9]' and details_integrity_version = 1));
 
 create index if not exists messages_integrity_review_idx
