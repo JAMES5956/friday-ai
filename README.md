@@ -23,6 +23,8 @@ This is a pre-deployment build. No public deployment has been performed. The app
 
 ## Design documentation
 
+- [Master Codex execution brief](docs/master-codex-execution.md) — one-run implementation instructions for all eight stages, with safety boundaries and verification requirements.
+
 - [FRIDAY AI Corporation department structure](docs/organization-structure.md) — intended governance, department mandates, reporting relationships, meeting cadence and approval boundaries.
 - [System architecture](docs/architecture.md) — current technical architecture.
 - [Telephony design](docs/telephony.md) — telephony planning; phone calling remains paused and is not operational.
