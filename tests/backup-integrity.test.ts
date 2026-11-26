@@ -120,6 +120,34 @@ describe("NEXUS backup recovery inspection", () => {
     expect(report.issues).toContainEqual({ table: "conversations", code: "duplicate_id" });
     expect(getBackupReadiness(report)).toBe("blocked");
   });
+
+  it("blocks encrypted records that cannot be authenticated or decrypted", () => {
+    process.env.FRIDAY_DATA_ENCRYPTION_KEY = TEST_KEY;
+    const report = inspectBackupTables("owner-a", {
+      messages: [{
+        id: "message-broken",
+        user_id: "owner-a",
+        content: "friday:v1:not-valid-ciphertext",
+        integrity_digest: createMemoryIntegrityDigest(
+          "owner-a", "message-broken", "friday:v1:not-valid-ciphertext", "message"
+        ),
+        integrity_version: 1
+      }]
+    });
+    expect(report.unreadable).toBe(1);
+    expect(report.issues).toContainEqual({ table: "messages", code: "ciphertext_unreadable" });
+    expect(getBackupReadiness(report)).toBe("blocked");
+  });
+
+  it("requires review for legacy records and blocks them if ciphertext is unreadable", () => {
+    process.env.FRIDAY_DATA_ENCRYPTION_KEY = TEST_KEY;
+    const report = inspectBackupTables("owner-a", {
+      memories: [{ id: "legacy-broken", user_id: "owner-a", content: "not-encrypted" }]
+    });
+    expect(report.legacyUnsealed).toBe(1);
+    expect(report.unreadable).toBe(1);
+    expect(getBackupReadiness(report)).toBe("blocked");
+  });
 });
 
 describe("NEXUS backup payload shape validation", () => {
