@@ -5,8 +5,6 @@ import { createBackupSignature, decryptPrivateData, encryptPrivateData, verifyBa
 import { BACKUP_TABLES, getBackupReadiness, inspectBackupTables, type BackupTables } from "@/lib/security/backup-integrity";
 
 export const runtime = "nodejs";
-const MAX_ROWS_PER_TABLE = 5000;
-const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
 const TABLES = BACKUP_TABLES;
 const MAX_ROWS_PER_TABLE = 5000;
 const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
