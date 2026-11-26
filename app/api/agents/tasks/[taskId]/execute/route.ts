@@ -40,8 +40,8 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
     if (!agent || agent.id === "friday" || agent.id === "nexus") return fail("INVALID_AGENT", "This task is not assigned to an executable specialist.", 400);
     if (!resolveAgentModelConfig(agent.id)) return fail("AGENT_MODEL_NOT_CONFIGURED", `Configure AI_${agent.id.toUpperCase()}_MODEL and the shared provider credentials before running this specialist.`, 503);
 
-    if (task.task_integrity_digest !== null &&
-        (task.task_integrity_version !== 1 || !verifyMemoryIntegrityDigest(owner.user.id, task.id, task.task_ciphertext, task.task_integrity_digest, "agent_task"))) {
+    if (task.task_integrity_digest === null || task.task_integrity_version !== 1 ||
+        !verifyMemoryIntegrityDigest(owner.user.id, task.id, task.task_ciphertext, task.task_integrity_digest, "agent_task")) {
       return fail("TASK_INTEGRITY_FAILED", "NEXUS detected changed task content. Execution has been stopped.", 503);
     }
     let taskDescription: string;
