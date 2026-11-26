@@ -319,3 +319,12 @@ h1 span { color: var(--cyan); text-shadow: 0 0 35px rgba(112,228,244,.22); }
 .knowledge-search{display:flex;gap:8px;margin:14px 0 10px}
 .knowledge-search input{flex:1;min-width:0;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--text);padding:10px 12px;font:inherit;font-size:12px}
 .knowledge-search button{border:1px solid var(--line);border-radius:9px;background:rgba(112,228,244,.1);color:#a8edf4;padding:8px 12px;font-size:11px;cursor:pointer}
+
+
+.knowledge-context-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(112,228,244,.045);color:var(--muted);font-size:11px}
+.knowledge-context-toolbar button{border:1px solid rgba(112,228,244,.35);border-radius:8px;background:rgba(112,228,244,.1);color:#a8edf4;padding:8px 10px;font-size:10px;cursor:pointer}
+.knowledge-context-toolbar button:disabled{opacity:.4;cursor:not-allowed}
+.knowledge-record-flags{display:grid;justify-items:end;gap:7px}
+.knowledge-context-choice{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:10px;white-space:nowrap}
+.knowledge-context-choice input{accent-color:#78cbd8}
+@media(max-width:520px){.knowledge-context-toolbar{align-items:flex-start;flex-direction:column}.knowledge-record-flags{justify-items:start}}
