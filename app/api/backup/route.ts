@@ -165,6 +165,11 @@ export async function GET() {
     };
     const signature = createBackupSignature(context.owner.id, JSON.stringify(unsignedEnvelope));
     const backup = { ...unsignedEnvelope, signature };
+    const { error: auditError } = await context.supabase.from("security_audit_events").insert({
+      user_id: context.owner.id, event_type: "owner_backup_exported", severity: "info",
+      details: { recordCount: Object.values(counts).reduce((sum, count) => sum + count, 0), legacyUnsealed: integrityReport.legacyUnsealed }
+    });
+    if (auditError) return fail("Backup export was stopped because NEXUS could not record its audit event.", 503);
     const body = JSON.stringify(backup);
     if (new TextEncoder().encode(body).byteLength > MAX_BACKUP_BYTES) return fail("Backup exceeds the safe export size limit.", 413);
     return new NextResponse(body, {
@@ -239,6 +244,12 @@ export async function POST(request: Request) {
     }
     const actualReport = inspectTables(context.owner.id, tables);
     const readiness = reportReadiness(actualReport);
+    const { error: auditError } = await context.supabase.from("security_audit_events").insert({
+      user_id: context.owner.id, event_type: "owner_backup_verified",
+      severity: readiness === "blocked" ? "critical" : readiness === "review_required" ? "warning" : "info",
+      details: { readiness, integrityVerified: actualReport.integrityVerified, legacyUnsealed: actualReport.legacyUnsealed, tampered: actualReport.tampered, unreadable: actualReport.unreadable }
+    });
+    if (auditError) return fail("Backup verification was stopped because NEXUS could not record its audit event.", 503);
     return NextResponse.json({
       valid: actualReport.tampered === 0 && actualReport.unreadable === 0,
       readiness,
