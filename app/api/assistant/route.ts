@@ -303,6 +303,10 @@ export async function POST(request: Request) {
     }
     try {
       selectedKnowledge = eligibleRows.map(row => {
+        if (row.integrity_version !== 1 || typeof row.integrity_digest !== "string" ||
+            !verifyMemoryIntegrityDigest(owner.user.id, row.id, row.payload_ciphertext, row.integrity_digest, "knowledge")) {
+          throw new Error("Knowledge archive integrity mismatch");
+        }
         const decoded = JSON.parse(decryptPrivateData(row.payload_ciphertext));
         if (!decoded || typeof decoded.title !== "string" || typeof decoded.body !== "string") throw new Error("Invalid archive payload");
         return JSON.stringify({ title: decoded.title, body: decoded.body, rationale: decoded.rationale, project: decoded.project });
@@ -327,6 +331,9 @@ export async function POST(request: Request) {
     }
     try {
       selectedProjects = (projectRows ?? []).map(row => {
+        if (!verifyMemoryIntegrityDigest(owner.user.id, row.id, row.payload_ciphertext, row.integrity_digest!, "project")) {
+          throw new Error("Project integrity mismatch");
+        }
         const project = JSON.parse(decryptPrivateData(row.payload_ciphertext));
         if (!validateProjectPayload(project) || project.status === "archived") throw new Error("Unavailable project");
         return JSON.stringify({ title: project.title, purpose: project.purpose, status: project.status, priority: project.priority, milestones: project.milestones, tasks: project.tasks, progressUpdates: Array.isArray(project.progressUpdates) ? project.progressUpdates.slice(0, 5) : [], blockers: project.blockers });
