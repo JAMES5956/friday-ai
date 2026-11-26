@@ -15,9 +15,11 @@ type IntegrityReport = {
   counts: { verified: number; legacy_unsealed: number; tampered: number; unreadable: number };
   records: MemoryIntegrityRecord[];
 };
+type SecurityEvent = { id: string; event_type: string; severity: "info" | "warning" | "critical"; details: Record<string, unknown>; created_at: string };
 
 export default function MemoryIntegrityPanel() {
   const [report, setReport] = useState<IntegrityReport | null>(null);
+  const [events, setEvents] = useState<SecurityEvent[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
@@ -30,6 +32,11 @@ export default function MemoryIntegrityPanel() {
       if (!response.ok) { setStatus(payload.error ?? "NEXUS could not verify memory integrity."); return; }
       setReport(payload.report);
       setSelected([]);
+      const eventResponse = await fetch("/api/security/events", { cache: "no-store" });
+      if (eventResponse.ok) {
+        const eventPayload = await eventResponse.json();
+        setEvents(Array.isArray(eventPayload.events) ? eventPayload.events : []);
+      }
     } catch { setStatus("Could not reach the NEXUS memory-integrity service."); }
     finally { setBusy(false); }
   }, []);
@@ -90,6 +97,13 @@ export default function MemoryIntegrityPanel() {
         <button type="button" disabled={busy} onClick={() => void scan()}><Activity size={13} /> Run scan again</button>
       </div>
     </> : null}
+    <div className="nexus-integrity-list">
+      <h3>Persistent security history</h3>
+      {events.length ? events.map(event => <div className="nexus-integrity-row" key={event.id}>
+        <span><strong>{event.event_type.replaceAll("_", " ")}</strong><small>{new Date(event.created_at).toLocaleString()}</small></span>
+        <span className={"nexus-integrity-status " + event.severity}>{event.severity}</span>
+      </div>) : <p className="nexus-integrity-note">No recorded NEXUS security events yet.</p>}
+    </div>
     {status ? <p className="nexus-integrity-note" role="status">{status}</p> : null}
     <p className="nexus-integrity-note">Legacy specialist, archive and project records are reported for review but are not bulk-sealed here. Only explicitly selected personal memories can be sealed through this panel. Conversation messages, specialist task descriptions and results, and encrypted task-event details are now checked for owner- and record-bound signatures. Older records remain legacy until separately reviewed; no automatic backfill is performed.</p>
   </section>;
