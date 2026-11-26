@@ -26,6 +26,7 @@ This is a pre-deployment build. No public deployment has been performed. The app
 - [FRIDAY AI Corporation department structure](docs/organization-structure.md) — intended governance, department mandates, reporting relationships, meeting cadence and approval boundaries.
 - [System architecture](docs/architecture.md) — current technical architecture.
 - [Telephony design](docs/telephony.md) — telephony planning; phone calling remains paused and is not operational.
+- [Department report template](docs/department-report-template.md) — standard progress, risk, dependency and decision reporting format.
 
 ## Technology
 
