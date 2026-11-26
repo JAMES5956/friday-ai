@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnerSession } from "@/lib/auth/owner";
-import { decryptPrivateData, encryptPrivateData } from "@/lib/security/encryption";
+import { createMemoryIntegrityDigest, decryptPrivateData, encryptPrivateData } from "@/lib/security/encryption";
 import { getMemoryExpiry, isMemorySensitivity } from "@/lib/memory/policy";
 
 async function getDatabaseClient() {
@@ -113,9 +114,14 @@ export async function POST(request: Request) {
   if (limitError) return NextResponse.json({ error: "NEXUS request protection is unavailable." }, { status: 503 });
   if (!withinLimit) return NextResponse.json({ error: "Too many memory changes. Try again in a minute." }, { status: 429 });
 
+  const memoryId = randomUUID();
+  let integrityDigest: string;
+  try { integrityDigest = createMemoryIntegrityDigest(auth.user.id, memoryId, encryptedContent); }
+  catch { return NextResponse.json({ error: "Private memory integrity protection is not configured." }, { status: 503 }); }
+
   const { data, error } = await supabase
     .from("memories")
-    .insert({ user_id: auth.user.id, category, content: encryptedContent, source: "owner", sensitivity, expires_at: expiresAt, source_reference: typeof payload.sourceReference === "string" ? payload.sourceReference.trim() || null : null })
+    .insert({ id: memoryId, user_id: auth.user.id, category, content: encryptedContent, integrity_digest: integrityDigest, integrity_version: 1, source: "owner", sensitivity, expires_at: expiresAt, source_reference: typeof payload.sourceReference === "string" ? payload.sourceReference.trim() || null : null })
     .select("id, category, sensitivity, expires_at, created_at")
     .single();
 

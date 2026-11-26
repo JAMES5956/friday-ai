@@ -6,6 +6,7 @@ import { signOut } from "@/app/workspace/sign-out";
 import WorkspaceClient from "@/app/workspace/workspace-client";
 import TaskCenter from "@/app/workspace/task-center";
 import AgentMemoryPanel from "@/app/workspace/agent-memory";
+import MemoryIntegrityPanel from "@/app/workspace/memory-integrity";
 import KnowledgeArchive from "@/app/workspace/knowledge-archive";
 import ProjectsPanel from "@/app/workspace/projects";
 import { specialistAgents } from "@/lib/agents/registry";
@@ -36,6 +37,7 @@ export default async function WorkspacePage() {
       </section>
       <TaskCenter />
       <AgentMemoryPanel />
+      <MemoryIntegrityPanel />
       <KnowledgeArchive />
       <ProjectsPanel />
       <WorkspaceClient />

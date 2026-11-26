@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 const PREFIX = "friday:v1:";
 
@@ -10,6 +10,23 @@ function getEncryptionKey() {
     throw new Error("FRIDAY_DATA_ENCRYPTION_KEY must be a canonical base64-encoded 32-byte key.");
   }
   return key;
+}
+
+export function createMemoryIntegrityDigest(ownerId: string, memoryId: string, ciphertext: string) {
+  const key = getEncryptionKey();
+  const integrityKey = createHmac("sha256", key).update("friday:memory-integrity:v1").digest();
+  return createHmac("sha256", integrityKey)
+    .update(ownerId).update("\\0")
+    .update(memoryId).update("\\0")
+    .update(ciphertext)
+    .digest("hex");
+}
+
+export function verifyMemoryIntegrityDigest(ownerId: string, memoryId: string, ciphertext: string, digest: string) {
+  if (!/^[a-f0-9]{64}$/.test(digest)) return false;
+  const expected = Buffer.from(createMemoryIntegrityDigest(ownerId, memoryId, ciphertext), "hex");
+  const actual = Buffer.from(digest, "hex");
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
 export function encryptPrivateData(plainText: string) {
