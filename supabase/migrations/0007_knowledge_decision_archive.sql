@@ -6,7 +6,7 @@ create table if not exists public.knowledge_records (
   record_type text not null check (record_type in ('knowledge', 'decision')),
   status text not null default 'active' check (status in ('active', 'superseded', 'archived')),
   sensitivity text not null default 'internal' check (sensitivity in ('routine', 'internal', 'restricted')),
-  payload_ciphertext text not null check (char_length(payload_ciphertext) between 1 and 50000),
+  payload_ciphertext text not null check (char_length(payload_ciphertext) between 1 and 60000),
   expires_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
