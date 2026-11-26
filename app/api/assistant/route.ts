@@ -126,7 +126,7 @@ export async function POST(request: Request) {
     return fail("REQUEST_TOO_LARGE", "Request is too large.", 413);
   }
 
-  let payload: { message?: unknown; conversationId?: unknown; includeMemory?: unknown };
+  let payload: { message?: unknown; conversationId?: unknown; includeMemory?: unknown; knowledgeRecordIds?: unknown };
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -149,6 +149,9 @@ export async function POST(request: Request) {
   }
   if (payload.includeMemory !== undefined && typeof payload.includeMemory !== "boolean") {
     return fail("INVALID_MEMORY_OPTION", "includeMemory must be true or false.", 400);
+  }
+  if (payload.knowledgeRecordIds !== undefined && (!Array.isArray(payload.knowledgeRecordIds) || payload.knowledgeRecordIds.length > 5 || payload.knowledgeRecordIds.some(id => typeof id !== "string" || !UUID_PATTERN.test(id)) || new Set(payload.knowledgeRecordIds).size !== payload.knowledgeRecordIds.length)) {
+    return fail("INVALID_KNOWLEDGE_SELECTION", "Select up to five valid, unique archive records.", 400);
   }
 
   let owner;
@@ -271,6 +274,34 @@ export async function POST(request: Request) {
     }
   }
 
+  let selectedKnowledge: string[] = [];
+  const selectedIds = (payload.knowledgeRecordIds ?? []) as string[];
+  if (selectedIds.length) {
+    const { data: knowledgeRows, error: knowledgeError } = await supabase.from("knowledge_records")
+      .select("sensitivity, expires_at, payload_ciphertext")
+      .eq("owner_id", owner.user.id)
+      .eq("status", "active")
+      .in("sensitivity", ["routine", "internal"])
+      .in("id", selectedIds);
+    if (knowledgeError) return fail("KNOWLEDGE_STORE_UNAVAILABLE", "Could not load selected archive records.", 503);
+    const eligibleRows = (knowledgeRows ?? []).filter(row => !row.expires_at || new Date(row.expires_at).getTime() > Date.now());
+    if (eligibleRows.length !== selectedIds.length) {
+      return fail("KNOWLEDGE_SELECTION_UNAVAILABLE", "One or more selected records are expired, restricted, archived or unavailable.", 400);
+    }
+    try {
+      selectedKnowledge = eligibleRows.map(row => {
+        const decoded = JSON.parse(decryptPrivateData(row.payload_ciphertext));
+        if (!decoded || typeof decoded.title !== "string" || typeof decoded.body !== "string") throw new Error("Invalid archive payload");
+        return JSON.stringify({ title: decoded.title, body: decoded.body, rationale: decoded.rationale, project: decoded.project });
+      });
+      if (selectedKnowledge.join("").length > 12_000) {
+        return fail("KNOWLEDGE_CONTEXT_TOO_LARGE", "The selected archive context is too large. Choose fewer or shorter records.", 413);
+      }
+    } catch {
+      return fail("PRIVATE_DATA_UNREADABLE", "Selected archive records could not be decrypted. Check the encryption key.", 503);
+    }
+  }
+
   let providerMessages;
   try {
     providerMessages = buildConversation([
@@ -279,7 +310,7 @@ export async function POST(request: Request) {
         content: decryptPrivateData(item.content)
       })),
       userMessage
-    ], savedMemories);
+    ], savedMemories, selectedKnowledge);
   } catch {
     return fail("PRIVATE_DATA_UNREADABLE", "Conversation history could not be decrypted. Check the encryption key.", 503);
   }
