@@ -30,7 +30,7 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
     if (!withinLimit) return fail("RATE_LIMITED", "Too many execution attempts. Wait before trying again.", 429);
 
     const { data: task, error: taskError } = await supabase.from("agent_tasks")
-      .select("id, assigned_agent_id, title, status, task_ciphertext, requires_owner_approval, owner_approved_at")
+      .select("id, assigned_agent_id, title, status, task_ciphertext, task_integrity_digest, task_integrity_version, requires_owner_approval, owner_approved_at")
       .eq("id", taskId).eq("owner_id", owner.user.id).maybeSingle();
     if (taskError || !task) return fail("TASK_NOT_FOUND", "Task was not found.", 404);
     if (task.status !== "queued" && task.status !== "failed") return fail("TASK_NOT_RUNNABLE", "Only queued or failed tasks can be run or retried.", 409);
@@ -40,6 +40,10 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
     if (!agent || agent.id === "friday" || agent.id === "nexus") return fail("INVALID_AGENT", "This task is not assigned to an executable specialist.", 400);
     if (!resolveAgentModelConfig(agent.id)) return fail("AGENT_MODEL_NOT_CONFIGURED", `Configure AI_${agent.id.toUpperCase()}_MODEL and the shared provider credentials before running this specialist.`, 503);
 
+    if (task.task_integrity_digest !== null &&
+        (task.task_integrity_version !== 1 || !verifyMemoryIntegrityDigest(owner.user.id, task.id, task.task_ciphertext, task.task_integrity_digest, "agent_task"))) {
+      return fail("TASK_INTEGRITY_FAILED", "NEXUS detected changed task content. Execution has been stopped.", 503);
+    }
     let taskDescription: string;
     try { taskDescription = decryptPrivateData(task.task_ciphertext); }
     catch { return fail("PRIVATE_DATA_UNREADABLE", "Task details could not be decrypted. Check the encryption key.", 503); }
@@ -91,9 +95,13 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
     if (!claimed) return fail("TASK_ALREADY_RUNNING", "Another request has already claimed this task.", 409);
     claimedByThisRequest = true;
 
+    const startEventId = randomUUID();
+    const startEventCiphertext = encryptPrivateData(JSON.stringify({ assignedAgentId: agent.id }));
     const { error: startAuditError } = await supabase.from("agent_task_events").insert({
-      owner_id: owner.user.id, task_id: taskId, actor_agent_id: "friday", event_type: "task_started",
-      details_ciphertext: encryptPrivateData(JSON.stringify({ assignedAgentId: agent.id }))
+      id: startEventId, owner_id: owner.user.id, task_id: taskId, actor_agent_id: "friday", event_type: "task_started",
+      details_ciphertext: startEventCiphertext,
+      details_integrity_digest: createMemoryIntegrityDigest(owner.user.id, startEventId, startEventCiphertext, "agent_task_event"),
+      details_integrity_version: 1
     });
     if (startAuditError) {
       await supabase.from("agent_tasks").update({ status: "queued" }).eq("id", taskId).eq("owner_id", owner.user.id).eq("status", "in_progress");
@@ -105,25 +113,36 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
     if (!result.ok) {
       await supabase.from("agent_tasks").update({ status: "failed" }).eq("id", taskId).eq("owner_id", owner.user.id).eq("status", "in_progress");
       claimedByThisRequest = false;
+      const failureEventId = randomUUID();
+      const failureCiphertext = encryptPrivateData(JSON.stringify({ code: result.code }));
       await supabase.from("agent_task_events").insert({
-        owner_id: owner.user.id, task_id: taskId, actor_agent_id: agent.id, event_type: "task_execution_failed",
-        details_ciphertext: encryptPrivateData(JSON.stringify({ code: result.code }))
+        id: failureEventId, owner_id: owner.user.id, task_id: taskId, actor_agent_id: agent.id, event_type: "task_execution_failed",
+        details_ciphertext: failureCiphertext,
+        details_integrity_digest: createMemoryIntegrityDigest(owner.user.id, failureEventId, failureCiphertext, "agent_task_event"),
+        details_integrity_version: 1
       });
       return fail(result.code, "The specialist could not complete this task. Check its model configuration or provider and retry.", 502);
     }
 
+    const resultCiphertext = encryptPrivateData(result.content);
+    const resultDigest = createMemoryIntegrityDigest(owner.user.id, taskId, resultCiphertext, "agent_task_result");
     const { error: completeError } = await supabase.from("agent_tasks").update({
-      status: "completed", result_ciphertext: encryptPrivateData(result.content)
+      status: "completed", result_ciphertext: resultCiphertext,
+      result_integrity_digest: resultDigest, result_integrity_version: 1
     }).eq("id", taskId).eq("owner_id", owner.user.id).eq("status", "in_progress");
     if (completeError) {
-      await supabase.from("agent_tasks").update({ status: "failed", result_ciphertext: null }).eq("id", taskId).eq("owner_id", owner.user.id).eq("status", "in_progress");
+      await supabase.from("agent_tasks").update({ status: "failed", result_ciphertext: null, result_integrity_digest: null, result_integrity_version: null }).eq("id", taskId).eq("owner_id", owner.user.id).eq("status", "in_progress");
       claimedByThisRequest = false;
       return fail("TASK_RESULT_SAVE_FAILED", "The specialist replied, but its result could not be saved.", 503);
     }
 
+    const completeEventId = randomUUID();
+    const completeEventCiphertext = encryptPrivateData(JSON.stringify({ resultLength: result.content.length }));
     const { error: completeAuditError } = await supabase.from("agent_task_events").insert({
-      owner_id: owner.user.id, task_id: taskId, actor_agent_id: agent.id, event_type: "task_completed",
-      details_ciphertext: encryptPrivateData(JSON.stringify({ resultLength: result.content.length }))
+      id: completeEventId, owner_id: owner.user.id, task_id: taskId, actor_agent_id: agent.id, event_type: "task_completed",
+      details_ciphertext: completeEventCiphertext,
+      details_integrity_digest: createMemoryIntegrityDigest(owner.user.id, completeEventId, completeEventCiphertext, "agent_task_event"),
+      details_integrity_version: 1
     });
     if (completeAuditError) {
       await supabase.from("agent_tasks").update({ status: "failed", result_ciphertext: null }).eq("id", taskId).eq("owner_id", owner.user.id);
@@ -156,11 +175,8 @@ Result summary: ${result.content.slice(0, 6000)}`);
           .select("id").maybeSingle();
         if (recovered) {
           await recoveryClient.from("agent_task_events").insert({
-            owner_id: recoveryOwnerId,
-            task_id: taskId,
-            actor_agent_id: "friday",
-            event_type: "task_execution_interrupted",
-            details_ciphertext: null
+            owner_id: recoveryOwnerId, task_id: taskId, actor_agent_id: "friday",
+            event_type: "task_execution_interrupted", details_ciphertext: null
           });
         }
       } catch {
