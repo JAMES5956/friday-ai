@@ -377,6 +377,7 @@ export default function WorkspaceClient() {
           ))}
           {sending && <div className="chat-message assistant"><span>FRIDAY</span><p>Thinking...</p></div>}
         </div>
+        {knowledgeRecordIds.length > 0 && <p className="knowledge-context-status">{knowledgeRecordIds.length} owner-selected archive record{knowledgeRecordIds.length === 1 ? "" : "s"} will be included in your next message. They will not be reused automatically.</p>}
         <label className="memory-context-toggle">
           <input type="checkbox" checked={includeMemory} onChange={event => setIncludeMemory(event.target.checked)} />
           Include my saved memories in this conversation
