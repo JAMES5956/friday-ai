@@ -33,29 +33,46 @@ export async function GET() {
     if (rateError) return fail("NEXUS rate protection is unavailable. Apply the security migration.", 503);
     if (!allowed) return fail("Too many integrity scans. Wait before scanning again.", 429);
 
-    const { data, error } = await context.supabase.from("memories")
-      .select("id, category, content, integrity_digest, integrity_version, updated_at")
-      .eq("user_id", context.owner.id).eq("retained", true)
-      .order("updated_at", { ascending: false }).limit(MAX_SCAN);
-    if (error) return fail("Memory integrity metadata is unavailable. Apply migration 0009_memory_integrity.sql.", 503);
+    const [personalResult, agentResult, archiveResult, projectResult] = await Promise.all([
+      context.supabase.from("memories").select("id, category, content, integrity_digest, integrity_version, updated_at")
+        .eq("user_id", context.owner.id).eq("retained", true).order("updated_at", { ascending: false }).limit(MAX_SCAN),
+      context.supabase.from("agent_memories").select("id, agent_id, content_ciphertext, integrity_digest, integrity_version, updated_at")
+        .eq("owner_id", context.owner.id).order("updated_at", { ascending: false }).limit(MAX_SCAN),
+      context.supabase.from("knowledge_records").select("id, record_type, payload_ciphertext, integrity_digest, integrity_version, updated_at")
+        .eq("owner_id", context.owner.id).order("updated_at", { ascending: false }).limit(MAX_SCAN),
+      context.supabase.from("project_records").select("id, payload_ciphertext, integrity_digest, integrity_version, updated_at")
+        .eq("owner_id", context.owner.id).order("updated_at", { ascending: false }).limit(MAX_SCAN)
+    ]);
+    if (personalResult.error || agentResult.error || archiveResult.error || projectResult.error) {
+      return fail("NEXUS could not scan every protected store. Confirm migrations 0006–0009 are applied.", 503);
+    }
 
-    const records = (data ?? []).map(row => {
-      let status: "verified" | "legacy_unsealed" | "tampered" | "unreadable";
-      if (row.integrity_digest === null || row.integrity_version === null) {
-        try {
-          decryptPrivateData(row.content);
-          status = "legacy_unsealed";
-        } catch { status = "unreadable"; }
-      } else if (row.integrity_version !== 1 || !verifyMemoryIntegrityDigest(context.owner.id, row.id, row.content, row.integrity_digest)) {
-        status = "tampered";
-      } else {
-        try {
-          decryptPrivateData(row.content);
-          status = "verified";
-        } catch { status = "unreadable"; }
+    const records: Array<{id:string;category:string;updatedAt:string;status:"verified"|"legacy_unsealed"|"tampered"|"unreadable";sealable:boolean}> = [];
+    const inspect = (rows: Array<Record<string, unknown>>, category: (row: Record<string, unknown>) => string,
+      ciphertextField: string, domain: string, sealable = false) => {
+      for (const row of rows) {
+        let status: "verified"|"legacy_unsealed"|"tampered"|"unreadable";
+        const ciphertext = row[ciphertextField];
+        const hasDigest = row.integrity_digest !== null || row.integrity_version !== null;
+        if (typeof row.id !== "string" || typeof ciphertext !== "string") status = "unreadable";
+        else if (!hasDigest) {
+          try { decryptPrivateData(ciphertext); status = "legacy_unsealed"; }
+          catch { status = "unreadable"; }
+        } else if (row.integrity_version !== 1 || typeof row.integrity_digest !== "string" ||
+          !verifyMemoryIntegrityDigest(context.owner.id, row.id, ciphertext, row.integrity_digest, domain)) status = "tampered";
+        else {
+          try { decryptPrivateData(ciphertext); status = "verified"; }
+          catch { status = "unreadable"; }
+        }
+        records.push({id: String(row.id), category: category(row), updatedAt: String(row.updated_at ?? ""),
+          status, sealable: sealable && status === "legacy_unsealed"});
       }
-      return { id: row.id, category: row.category, updatedAt: row.updated_at, status };
-    });
+    };
+    inspect((personalResult.data ?? []) as unknown as Array<Record<string,unknown>>, row => "Personal memory · " + String(row.category ?? "General"), "content", "memory", true);
+    inspect((agentResult.data ?? []) as unknown as Array<Record<string,unknown>>, row => "Specialist memory · " + String(row.agent_id ?? "Agent").toUpperCase(), "content_ciphertext", "agent_memory");
+    inspect((archiveResult.data ?? []) as unknown as Array<Record<string,unknown>>, row => "Knowledge archive · " + String(row.record_type ?? "Record"), "payload_ciphertext", "knowledge");
+    inspect((projectResult.data ?? []) as unknown as Array<Record<string,unknown>>, () => "Project record", "payload_ciphertext", "project");
+
     const counts = {
       verified: records.filter(item => item.status === "verified").length,
       legacy_unsealed: records.filter(item => item.status === "legacy_unsealed").length,
