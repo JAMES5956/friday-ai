@@ -1,41 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnerSession } from "@/lib/auth/owner";
-import {
-  createBackupSignature,
-  decryptPrivateData,
-  encryptPrivateData,
-  verifyBackupSignature,
-  verifyMemoryIntegrityDigest
-} from "@/lib/security/encryption";
+import { createBackupSignature, decryptPrivateData, encryptPrivateData, verifyBackupSignature } from "@/lib/security/encryption";
+import { BACKUP_TABLES, getBackupReadiness, inspectBackupTables, type BackupTables } from "@/lib/security/backup-integrity";
 
 export const runtime = "nodejs";
 const MAX_ROWS_PER_TABLE = 5000;
 const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
-const TABLES = [
-  ["friday_profiles", "user_id"],
-  ["conversations", "user_id"],
-  ["messages", "user_id"],
-  ["memories", "user_id"],
-  ["security_audit_events", "user_id"],
-  ["agent_workspaces", "owner_id"],
-  ["agent_memories", "owner_id"],
-  ["agent_memory_grants", "owner_id"],
-  ["agent_tasks", "owner_id"],
-  ["agent_task_events", "owner_id"],
-  ["knowledge_records", "owner_id"],
-  ["project_records", "owner_id"]
-] as const;
-
-type BackupTables = Record<string, Record<string, unknown>[]>;
-type IntegrityReport = {
-  integrityVerified: number;
-  authenticatedEncrypted: number;
-  legacyUnsealed: number;
-  tampered: number;
-  unreadable: number;
-  issues: Array<{ table: string; code: "integrity_mismatch" | "ciphertext_unreadable" | "owner_mismatch" | "duplicate_id" }>;
-};
+const TABLES = BACKUP_TABLES;
+const MAX_ROWS_PER_TABLE = 5000;
+const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
 
 function fail(message: string, status: number) {
   return NextResponse.json({ error: message }, { status, headers: { "Cache-Control": "no-store" } });
@@ -48,81 +22,6 @@ async function ownerContext() {
   return { owner: owner.user, supabase } as const;
 }
 
-function inspectTables(ownerId: string, tables: BackupTables): IntegrityReport {
-  const report: IntegrityReport = {
-    integrityVerified: 0, authenticatedEncrypted: 0, legacyUnsealed: 0,
-    tampered: 0, unreadable: 0, issues: []
-  };
-  const addIssue = (table: string, code: IntegrityReport["issues"][number]["code"]) => report.issues.push({ table, code });
-  const decrypt = (table: string, row: Record<string, unknown>, field: string) => {
-    const value = row[field];
-    if (typeof value !== "string" || !value) return;
-    try { decryptPrivateData(value); report.authenticatedEncrypted++; }
-    catch { report.unreadable++; addIssue(table, "ciphertext_unreadable"); }
-  };
-  const inspectSigned = (table: string, rows: Record<string, unknown>[], ciphertextField: string, recordType: string, digestField = "integrity_digest", versionField = "integrity_version") => {
-    for (const row of rows) {
-      const id = row.id;
-      const ciphertext = row[ciphertextField];
-      if (typeof id !== "string" || typeof ciphertext !== "string") {
-        report.unreadable++; addIssue(table, "ciphertext_unreadable"); continue;
-      }
-      const hasIntegrity = row[digestField] != null || row[versionField] != null;
-      if (hasIntegrity) {
-        if (row[versionField] !== 1 || typeof row[digestField] !== "string" ||
-            !verifyMemoryIntegrityDigest(ownerId, id, ciphertext, row[digestField], recordType)) {
-          report.tampered++; addIssue(table, "integrity_mismatch"); continue;
-        }
-        report.integrityVerified++;
-      } else {
-        report.legacyUnsealed++;
-      }
-      decrypt(table, row, ciphertextField);
-    }
-  };
-
-  for (const [table, ownerColumn] of TABLES) {
-    const rows = tables[table] ?? [];
-    const seen = new Set<string>();
-    for (const row of rows) {
-      if (row[ownerColumn] !== ownerId) { addIssue(table, "owner_mismatch"); report.tampered++; }
-      if (typeof row.id === "string") {
-        if (seen.has(row.id)) { addIssue(table, "duplicate_id"); report.tampered++; }
-        seen.add(row.id);
-      }
-    }
-  }
-
-  inspectSigned("memories", tables.memories ?? [], "content", "memory");
-  inspectSigned("agent_memories", tables.agent_memories ?? [], "content_ciphertext", "agent_memory");
-  inspectSigned("knowledge_records", tables.knowledge_records ?? [], "payload_ciphertext", "knowledge");
-  inspectSigned("project_records", tables.project_records ?? [], "payload_ciphertext", "project");
-
-  // Conversations and specialist work must pass the same owner/record/domain-bound
-  // signature checks as the other encrypted stores before any backup is exported
-  // or considered recoverable. Unsigned historic rows remain review-required.
-  inspectSigned("messages", tables.messages ?? [], "content", "message");
-  inspectSigned("agent_tasks", tables.agent_tasks ?? [], "task_ciphertext", "agent_task",
-    "task_integrity_digest", "task_integrity_version");
-  for (const row of tables.agent_tasks ?? []) {
-    if (row.result_ciphertext == null) continue;
-    inspectSigned("agent_tasks", [row], "result_ciphertext", "agent_task_result",
-      "result_integrity_digest", "result_integrity_version");
-  }
-  for (const row of tables.agent_task_events ?? []) {
-    if (row.details_ciphertext == null) continue;
-    inspectSigned("agent_task_events", [row], "details_ciphertext", "agent_task_event",
-      "details_integrity_digest", "details_integrity_version");
-  }
-
-  return report;
-}
-
-function reportReadiness(report: IntegrityReport) {
-  if (report.tampered || report.unreadable) return "blocked";
-  if (report.legacyUnsealed) return "review_required";
-  return "ready";
-}
 
 export async function GET() {
   try {
@@ -147,7 +46,7 @@ export async function GET() {
       counts[result.table] = tables[result.table].length;
     }
 
-    const integrityReport = inspectTables(context.owner.id, tables);
+    const integrityReport = inspectBackupTables(context.owner.id, tables);
     if (integrityReport.tampered || integrityReport.unreadable) {
       return NextResponse.json({
         error: "Backup was blocked because NEXUS found tampered or unreadable encrypted records. Resolve those records before exporting.",
@@ -252,8 +151,8 @@ export async function POST(request: Request) {
         return fail("Backup table structure or row counts are invalid.", 400);
       }
     }
-    const actualReport = inspectTables(context.owner.id, tables);
-    const readiness = reportReadiness(actualReport);
+    const actualReport = inspectBackupTables(context.owner.id, tables);
+    const readiness = getBackupReadiness(actualReport);
     const { error: auditError } = await context.supabase.from("security_audit_events").insert({
       user_id: context.owner.id, event_type: "owner_backup_verified",
       severity: readiness === "blocked" ? "critical" : readiness === "review_required" ? "warning" : "info",
