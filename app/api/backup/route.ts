@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnerSession } from "@/lib/auth/owner";
 import { createBackupSignature, decryptPrivateData, encryptPrivateData, verifyBackupSignature } from "@/lib/security/encryption";
-import { BACKUP_TABLES, getBackupReadiness, inspectBackupTables, type BackupTables } from "@/lib/security/backup-integrity";
+import { BACKUP_TABLES, getBackupReadiness, inspectBackupTables, validateBackupStructure, type BackupTables } from "@/lib/security/backup-integrity";
 
 export const runtime = "nodejs";
 const TABLES = BACKUP_TABLES;
@@ -136,19 +136,12 @@ export async function POST(request: Request) {
       return fail("Backup payload could not be decrypted. Check the matching FRIDAY encryption key.", 409);
     }
     if (payload.format !== input.format || payload.version !== input.version ||
-        payload.ownerId !== context.owner.id || payload.createdAt !== input.createdAt ||
-        !payload.tables || typeof payload.tables !== "object" || Array.isArray(payload.tables) ||
-        !payload.counts || typeof payload.counts !== "object" || Array.isArray(payload.counts)) {
+        payload.ownerId !== context.owner.id || payload.createdAt !== input.createdAt) {
       return fail("Decrypted backup payload does not match its signed envelope.", 409);
     }
-
-    const tables = payload.tables as BackupTables;
-    const counts = payload.counts as Record<string, unknown>;
-    for (const [table] of TABLES) {
-      if (!Array.isArray(tables[table]) || tables[table].length > MAX_ROWS_PER_TABLE || counts[table] !== tables[table].length) {
-        return fail("Backup table structure or row counts are invalid.", 400);
-      }
-    }
+    const structure = validateBackupStructure(payload.tables, payload.counts, MAX_ROWS_PER_TABLE);
+    if (!structure.valid) return fail("Backup table structure or row counts are invalid.", 400);
+    const { tables, counts } = structure;
     const actualReport = inspectBackupTables(context.owner.id, tables);
     const readiness = getBackupReadiness(actualReport);
     const { error: auditError } = await context.supabase.from("security_audit_events").insert({
