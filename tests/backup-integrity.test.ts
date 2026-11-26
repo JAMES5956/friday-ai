@@ -12,7 +12,7 @@ afterEach(() => {
   else process.env.FRIDAY_DATA_ENCRYPTION_KEY = originalKey;
 });
 
-function signedRow(ownerId: string, id: string, domain: string, ciphertextField: string, digestField = "integrity_digest", versionField = "integrity_version") {
+function signedRow(ownerId: string, id: string, domain: string, ciphertextField: string, digestField = "integrity_digest", versionField = "integrity_version"): Record<string, unknown> {
   const ciphertext = encryptPrivateData("protected test record");
   return {
     id, owner_id: ownerId, user_id: ownerId, [ciphertextField]: ciphertext,
