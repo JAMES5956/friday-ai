@@ -123,8 +123,8 @@ describe("NEXUS backup recovery inspection", () => {
 });
 
 describe("NEXUS backup payload shape validation", () => {
-  const emptyTables = () => Object.fromEntries(BACKUP_TABLES.map(([name]) => [name, []]));
-  const emptyCounts = () => Object.fromEntries(BACKUP_TABLES.map(([name]) => [name, 0]));
+  const emptyTables = (): Record<string, unknown[]> => Object.fromEntries(BACKUP_TABLES.map(([name]) => [name, []]));
+  const emptyCounts = (): Record<string, unknown> => Object.fromEntries(BACKUP_TABLES.map(([name]) => [name, 0]));
 
   it("accepts exactly the known owner tables with matching row counts", () => {
     const result = validateBackupStructure(emptyTables(), emptyCounts(), 5000);
