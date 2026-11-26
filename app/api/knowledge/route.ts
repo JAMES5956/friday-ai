@@ -40,12 +40,18 @@ export async function GET(request: Request) {
   if (error) return fail("Could not load the private archive. Apply the knowledge archive migration if it is pending.", 503);
   try {
     const now = Date.now();
-    const records = (data ?? []).map(row => ({
-      id: row.id, type: row.record_type, status: row.status, sensitivity: row.sensitivity,
-      expiresAt: row.expires_at, createdAt: row.created_at, updatedAt: row.updated_at,
-      expired: Boolean(row.expires_at && new Date(row.expires_at).getTime() <= now),
-      payload: JSON.parse(decryptPrivateData(row.payload_ciphertext))
-    }));
+    const records = (data ?? []).map(row => {
+      if (row.integrity_version !== 1 || typeof row.integrity_digest !== "string" ||
+          !verifyMemoryIntegrityDigest(context.owner.id, row.id, row.payload_ciphertext, row.integrity_digest, "knowledge")) {
+        throw new Error("Knowledge archive integrity mismatch");
+      }
+      return {
+        id: row.id, type: row.record_type, status: row.status, sensitivity: row.sensitivity,
+        expiresAt: row.expires_at, createdAt: row.created_at, updatedAt: row.updated_at,
+        expired: Boolean(row.expires_at && new Date(row.expires_at).getTime() <= now),
+        payload: JSON.parse(decryptPrivateData(row.payload_ciphertext))
+      };
+    });
     const filtered = search ? records.filter(record => {
       const payloadText = [record.payload.title, record.payload.body, record.payload.rationale, record.payload.project,
         ...(Array.isArray(record.payload.tags) ? record.payload.tags : []),
