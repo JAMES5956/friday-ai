@@ -12,6 +12,7 @@ type ArchiveRecord = {
   expired: boolean;
   createdAt: string;
   updatedAt: string;
+  integrityStatus: "verified" | "legacy_unsealed";
   payload: {
     title: string;
     body: string;

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnerSession } from "@/lib/auth/owner";
-import { decryptPrivateData, encryptPrivateData } from "@/lib/security/encryption";
+import { createMemoryIntegrityDigest, decryptPrivateData, encryptPrivateData, verifyMemoryIntegrityDigest } from "@/lib/security/encryption";
 import { getArchiveExpiry, isRecordStatus, isRecordType, isSensitivity, validateKnowledgePayload } from "@/lib/knowledge/policy";
 
 export const runtime = "nodejs";
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
   if (search.length > 120) return fail("Search query is too long.", 400);
 
   let query = context.supabase.from("knowledge_records")
-    .select("id, record_type, status, sensitivity, expires_at, created_at, updated_at, payload_ciphertext")
+    .select("id, record_type, status, sensitivity, expires_at, created_at, updated_at, payload_ciphertext, integrity_digest, integrity_version")
     .eq("owner_id", context.owner.id).eq("status", status)
     .order("updated_at", { ascending: false }).limit(100);
   if (type) query = query.eq("record_type", type);

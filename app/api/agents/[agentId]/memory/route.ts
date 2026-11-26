@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnerSession } from "@/lib/auth/owner";
-import { encryptPrivateData, decryptPrivateData } from "@/lib/security/encryption";
+import { createMemoryIntegrityDigest, encryptPrivateData, decryptPrivateData, verifyMemoryIntegrityDigest } from "@/lib/security/encryption";
 import { specialistAgents } from "@/lib/agents/registry";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +26,7 @@ export async function GET(_request: Request, route: { params: Promise<{ agentId:
     const ctx = await context(agentId);
     if ("response" in ctx) return ctx.response;
     const { data, error } = await ctx.supabase.from("agent_memories")
-      .select("id, memory_type, sensitivity, content_ciphertext, source_agent_id, expires_at, created_at, updated_at")
+      .select("id, memory_type, sensitivity, content_ciphertext, integrity_digest, integrity_version, source_agent_id, expires_at, created_at, updated_at")
       .eq("owner_id", ctx.owner.user.id).eq("agent_id", agentId)
       .or("expires_at.is.null,expires_at.gt." + new Date().toISOString())
       .order("updated_at", { ascending: false }).limit(100);

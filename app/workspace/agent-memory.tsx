@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Brain, RefreshCw, Plus, Trash2, Share2, ShieldCheck } from "lucide-react";
 import { specialistAgents } from "@/lib/agents/registry";
 
-type AgentMemory = { id: string; memoryType: string; sensitivity: string; content: string; expiresAt: string | null; createdAt: string };
+type AgentMemory = { id: string; memoryType: string; sensitivity: string; content: string; integrityStatus: "verified" | "legacy_unsealed" | "tampered" | "unreadable"; expiresAt: string | null; createdAt: string };
 type MemoryGrant = { id: string; memory_id: string; from_agent_id: string; to_agent_id: string; expires_at: string };
 const agents = specialistAgents.filter(agent => agent.id !== "friday" && agent.id !== "nexus");
 

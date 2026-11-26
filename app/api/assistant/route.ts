@@ -291,7 +291,7 @@ export async function POST(request: Request) {
   const selectedIds = (payload.knowledgeRecordIds ?? []) as string[];
   if (selectedIds.length) {
     const { data: knowledgeRows, error: knowledgeError } = await supabase.from("knowledge_records")
-      .select("sensitivity, expires_at, payload_ciphertext")
+      .select("id, sensitivity, expires_at, payload_ciphertext, integrity_digest, integrity_version")
       .eq("owner_id", owner.user.id)
       .eq("status", "active")
       .in("sensitivity", ["routine", "internal"])
@@ -319,7 +319,7 @@ export async function POST(request: Request) {
   const selectedProjectIds = (payload.projectRecordIds ?? []) as string[];
   if (selectedProjectIds.length) {
     const { data: projectRows, error: projectError } = await supabase.from("project_records")
-      .select("id, payload_ciphertext").eq("owner_id", owner.user.id).in("id", selectedProjectIds);
+      .select("id, payload_ciphertext, integrity_digest, integrity_version").eq("owner_id", owner.user.id).in("id", selectedProjectIds);
     if (projectError) return fail("PROJECT_STORE_UNAVAILABLE", "Could not load selected project context. Apply migration 0008 if it is pending.", 503);
     if ((projectRows ?? []).length !== selectedProjectIds.length) return fail("PROJECT_SELECTION_UNAVAILABLE", "One or more selected projects are unavailable.", 400);
     if ((projectRows ?? []).some(row => row.integrity_version !== 1 || !row.integrity_digest)) {
