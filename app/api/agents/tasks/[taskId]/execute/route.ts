@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnerSession } from "@/lib/auth/owner";
-import { decryptPrivateData, encryptPrivateData } from "@/lib/security/encryption";
+import { createMemoryIntegrityDigest, decryptPrivateData, encryptPrivateData, verifyMemoryIntegrityDigest } from "@/lib/security/encryption";
 import { specialistAgents } from "@/lib/agents/registry";
 import { executeAgentTask, resolveAgentModelConfig } from "@/lib/agents/runtime";
 import { isUnexpired } from "@/lib/agents/memory-sharing";
@@ -44,14 +45,19 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
     catch { return fail("PRIVATE_DATA_UNREADABLE", "Task details could not be decrypted. Check the encryption key.", 503); }
 
     const { data: memoryRows, error: memoryError } = await supabase.from("agent_memories")
-      .select("content_ciphertext, memory_type, sensitivity, expires_at")
+      .select("id, content_ciphertext, memory_type, sensitivity, expires_at, integrity_digest, integrity_version")
       .eq("owner_id", owner.user.id).eq("agent_id", agent.id)
       .order("updated_at", { ascending: false }).limit(12);
     if (memoryError) return fail("AGENT_MEMORY_UNAVAILABLE", "The specialist's private memory could not be loaded.", 503);
     let memories: string[];
     try {
       const now = Date.now();
-      memories = (memoryRows ?? []).filter(row => row.sensitivity !== "restricted" && isUnexpired(row.expires_at, now))
+      const storedMemories = memoryRows ?? [];
+      const integrityFailure = storedMemories.some(row => row.integrity_digest !== null &&
+        (row.integrity_version !== 1 || !verifyMemoryIntegrityDigest(owner.user.id, row.id, row.content_ciphertext, row.integrity_digest, "agent_memory")));
+      if (integrityFailure) return fail("AGENT_MEMORY_INTEGRITY_FAILED", "NEXUS detected a specialist-memory integrity mismatch. Execution has been stopped.", 503);
+      memories = storedMemories.filter(row => row.integrity_version === 1 && row.integrity_digest &&
+        row.sensitivity !== "restricted" && isUnexpired(row.expires_at, now))
         .map(row => decryptPrivateData(row.content_ciphertext));
     } catch { return fail("PRIVATE_DATA_UNREADABLE", "The specialist's private memory could not be decrypted.", 503); }
 
@@ -62,14 +68,18 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
     const activeGrants = (grantRows ?? []).filter(grant => isUnexpired(grant.expires_at));
     if (activeGrants.length) {
       const { data: sharedRows, error: sharedError } = await supabase.from("agent_memories")
-        .select("id, agent_id, content_ciphertext, sensitivity, expires_at")
+        .select("id, agent_id, content_ciphertext, sensitivity, expires_at, integrity_digest, integrity_version")
         .eq("owner_id", owner.user.id).in("id", activeGrants.map(grant => grant.memory_id));
       if (sharedError) return fail("SHARED_MEMORY_UNAVAILABLE", "Owner-approved shared memory could not be loaded.", 503);
       try {
         for (const grant of activeGrants) {
           const shared = (sharedRows ?? []).find(row => row.id === grant.memory_id && row.agent_id === grant.from_agent_id &&
             row.sensitivity !== "restricted" && isUnexpired(row.expires_at));
-          if (shared) memories.push("Owner-approved memory shared from " + grant.from_agent_id.toUpperCase() + ": " + decryptPrivateData(shared.content_ciphertext));
+          if (shared && shared.integrity_digest !== null && shared.integrity_version !== 1) throw new Error("Shared memory integrity metadata invalid");
+          if (shared && shared.integrity_version === 1 && shared.integrity_digest) {
+            if (!verifyMemoryIntegrityDigest(owner.user.id, shared.id, shared.content_ciphertext, shared.integrity_digest, "agent_memory")) throw new Error("Shared memory integrity mismatch");
+            memories.push("Owner-approved memory shared from " + grant.from_agent_id.toUpperCase() + ": " + decryptPrivateData(shared.content_ciphertext));
+          }
         }
       } catch { return fail("PRIVATE_DATA_UNREADABLE", "Approved shared memory could not be decrypted.", 503); }
     }
@@ -121,10 +131,13 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
       return fail("TASK_AUDIT_FAILED", "The result was withheld because its completion event could not be recorded.", 503);
     }
 
+    const workingMemoryId = randomUUID();
+    const workingMemoryCiphertext = encryptPrivateData(`Completed task: ${task.title}
+Result summary: ${result.content.slice(0, 6000)}`);
+    const workingMemoryDigest = createMemoryIntegrityDigest(owner.user.id, workingMemoryId, workingMemoryCiphertext, "agent_memory");
     const { error: memorySaveError } = await supabase.from("agent_memories").insert({
-      owner_id: owner.user.id, agent_id: agent.id, memory_type: "working",
-      content_ciphertext: encryptPrivateData(`Completed task: ${task.title}
-Result summary: ${result.content.slice(0, 6000)}`),
+      id: workingMemoryId, owner_id: owner.user.id, agent_id: agent.id, memory_type: "working",
+      content_ciphertext: workingMemoryCiphertext, integrity_digest: workingMemoryDigest, integrity_version: 1,
       source_agent_id: agent.id, sensitivity: "internal"
     });
     return NextResponse.json({

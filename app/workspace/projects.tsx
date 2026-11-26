@@ -6,7 +6,7 @@ import { specialistAgents } from "@/lib/agents/registry";
 import { projectProgress, type ProjectPayload, type ProjectStatus } from "@/lib/projects/policy";
 import styles from "./projects.module.css";
 
-type ProjectRecord = { id: string; createdAt: string; updatedAt: string; payload: ProjectPayload };
+type ProjectRecord = { id: string; createdAt: string; updatedAt: string; integrityStatus: "verified" | "legacy_unsealed"; payload: ProjectPayload };
 const emptyPayload = (): ProjectPayload => ({
   title: "", purpose: "", status: "planning", priority: "normal", ownerAgentId: "friday",
   startDate: new Date().toISOString().slice(0, 10), targetDate: null,
@@ -147,7 +147,8 @@ export default function ProjectsPanel() {
         return <article className={styles.card} key={project.id}>
           <div className={styles.cardTop}><div><span className={styles.priority}>{project.payload.priority} priority</span><h3>{project.payload.title}</h3></div><select aria-label={"Status for " + project.payload.title} value={project.payload.status} disabled={busy} onChange={event => void updateProject(project, { ...project.payload, status: event.target.value as ProjectStatus })}><option value="planning">Planning</option><option value="active">Active</option><option value="on_hold">On hold</option><option value="completed">Completed</option><option value="archived">Archived</option></select></div>
           <p className={styles.purpose}>{project.payload.purpose}</p>
-          <label className={styles.contextChoice}><input type="checkbox" checked={selectedForContext.includes(project.id)} disabled={!selectedForContext.includes(project.id) && selectedForContext.length >= 3} onChange={event => toggleProjectContext(project.id, event.target.checked)} /> Include in next FRIDAY message</label>
+          {project.integrityStatus === "legacy_unsealed" && <button type="button" className={styles.sealLegacy} disabled={busy} onClick={() => { if (window.confirm("I have reviewed this project. Re-encrypt and seal this project record?")) void updateProject(project, project.payload); }}>I reviewed this project — seal it</button>}
+          <label className={styles.contextChoice}><input type="checkbox" checked={selectedForContext.includes(project.id)} disabled={project.integrityStatus !== "verified" || (!selectedForContext.includes(project.id) && selectedForContext.length >= 3)} onChange={event => toggleProjectContext(project.id, event.target.checked)} /> {project.integrityStatus === "verified" ? "Include in next FRIDAY message" : "Legacy record — review and seal before sharing"}</label>
           <div className={styles.meta}><span>Owner: {project.payload.ownerAgentId.toUpperCase()}</span><span>{project.payload.targetDate ? "Target: " + project.payload.targetDate : "No target date"}</span><span>Updated {new Date(project.updatedAt).toLocaleDateString()}</span></div>
           <div className={styles.progressLabel}><strong>{progress}% complete</strong><span>{project.payload.milestones.filter(item => item.status === "completed").length} / {project.payload.milestones.length} milestones · {project.payload.tasks.filter(item => item.status === "completed").length} / {project.payload.tasks.length} tasks</span></div>
           <div className={styles.progressTrack}><span style={{ width: progress + "%" }} /></div>

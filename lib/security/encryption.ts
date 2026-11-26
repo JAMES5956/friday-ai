@@ -12,19 +12,19 @@ function getEncryptionKey() {
   return key;
 }
 
-export function createMemoryIntegrityDigest(ownerId: string, memoryId: string, ciphertext: string) {
+export function createMemoryIntegrityDigest(ownerId: string, memoryId: string, ciphertext: string, recordType = "memory") {
   const key = getEncryptionKey();
   const integrityKey = createHmac("sha256", key).update("friday:memory-integrity:v1").digest();
   return createHmac("sha256", integrityKey)
-    .update(ownerId).update("\\0")
+    .update(recordType === "memory" ? ownerId : recordType + "\\0" + ownerId).update("\\0")
     .update(memoryId).update("\\0")
     .update(ciphertext)
     .digest("hex");
 }
 
-export function verifyMemoryIntegrityDigest(ownerId: string, memoryId: string, ciphertext: string, digest: string) {
+export function verifyMemoryIntegrityDigest(ownerId: string, memoryId: string, ciphertext: string, digest: string, recordType = "memory") {
   if (!/^[a-f0-9]{64}$/.test(digest)) return false;
-  const expected = Buffer.from(createMemoryIntegrityDigest(ownerId, memoryId, ciphertext), "hex");
+  const expected = Buffer.from(createMemoryIntegrityDigest(ownerId, memoryId, ciphertext, recordType), "hex");
   const actual = Buffer.from(digest, "hex");
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }

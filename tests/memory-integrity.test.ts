@@ -23,6 +23,14 @@ describe("NEXUS memory integrity signatures", () => {
     expect(verifyMemoryIntegrityDigest("owner-a", "memory-a", "ciphertext-a", "not-a-digest")).toBe(false);
   });
 
+  it("uses domain-separated signatures for each encrypted record store", () => {
+    process.env.FRIDAY_DATA_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString("base64");
+    const digest = createMemoryIntegrityDigest("owner-a", "record-a", "ciphertext-a", "knowledge");
+    expect(verifyMemoryIntegrityDigest("owner-a", "record-a", "ciphertext-a", digest, "knowledge")).toBe(true);
+    expect(verifyMemoryIntegrityDigest("owner-a", "record-a", "ciphertext-a", digest, "project")).toBe(false);
+    expect(verifyMemoryIntegrityDigest("owner-a", "record-a", "ciphertext-a", digest, "agent_memory")).toBe(false);
+  });
+
   it("fails closed when the encryption key is unavailable", () => {
     delete process.env.FRIDAY_DATA_ENCRYPTION_KEY;
     expect(() => createMemoryIntegrityDigest("owner", "memory", "ciphertext")).toThrow();

@@ -106,6 +106,39 @@ export async function PATCH(request: Request) {
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return fail("Send a JSON object.", 400);
     input = parsed as Record<string, unknown>;
   } catch { return fail("Send valid JSON.", 400); }
+  if (input.action === "seal-reviewed") {
+    if (input.ownerConfirmed !== true || typeof input.id !== "string" || !UUID_PATTERN.test(input.id)) {
+      return fail("Confirm review and provide a valid record ID.", 400);
+    }
+    let sealContext: Awaited<ReturnType<typeof ownerAndDb>>;
+    try { sealContext = await ownerAndDb(); } catch { return fail("Private archive is not configured.", 503); }
+    if ("error" in sealContext) return sealContext.error;
+    const { data: allowed, error: rateError } = await sealContext.supabase.rpc("consume_rate_limit", { p_limit: 10 });
+    if (rateError) return fail("NEXUS request protection is unavailable.", 503);
+    if (!allowed) return fail("Too many integrity changes. Wait before trying again.", 429);
+    const { data: legacy, error: readError } = await sealContext.supabase.from("knowledge_records")
+      .select("id, payload_ciphertext, integrity_digest, integrity_version")
+      .eq("id", input.id).eq("owner_id", sealContext.owner.id).maybeSingle();
+    if (readError) return fail("Could not load the selected archive record.", 503);
+    if (!legacy) return fail("Archive record not found.", 404);
+    if (legacy.integrity_digest !== null || legacy.integrity_version !== null) return fail("This record is already sealed or requires security review.", 409);
+    try {
+      const decoded = JSON.parse(decryptPrivateData(legacy.payload_ciphertext));
+      if (!validateKnowledgePayload(decoded)) return fail("Legacy archive payload failed validation and was not changed.", 409);
+      const ciphertext = encryptPrivateData(JSON.stringify(decoded));
+      const digest = createMemoryIntegrityDigest(sealContext.owner.id, legacy.id, ciphertext, "knowledge");
+      const { data: sealed, error: sealError } = await sealContext.supabase.from("knowledge_records")
+        .update({ payload_ciphertext: ciphertext, integrity_digest: digest, integrity_version: 1, integrity_sealed_at: new Date().toISOString() })
+        .eq("id", legacy.id).eq("owner_id", sealContext.owner.id).eq("payload_ciphertext", legacy.payload_ciphertext)
+        .is("integrity_digest", null).select("id").maybeSingle();
+      if (sealError || !sealed) return fail("Could not safely seal this record; it may have changed. Refresh and review it again.", 409);
+      await sealContext.supabase.from("security_audit_events").insert({
+        user_id: sealContext.owner.id, event_type: "knowledge_integrity_legacy_sealed", severity: "info",
+        details: { recordType: "knowledge" }
+      });
+      return NextResponse.json({ sealed: true }, { headers: { "Cache-Control": "no-store" } });
+    } catch { return fail("Legacy archive record could not be decrypted. It was not changed.", 503); }
+  }
   if (typeof input.id !== "string" || !UUID_PATTERN.test(input.id) || !isRecordStatus(input.status) || input.status === "active") {
     return fail("Provide a valid record ID and choose superseded or archived.", 400);
   }

@@ -7,3 +7,5 @@
 @media(max-width:620px){.panel{padding:15px}.grid{grid-template-columns:1fr}.cardTop{flex-direction:column}.cardTop select{max-width:none}.progressLabel{flex-direction:column}.sublist>div{grid-template-columns:minmax(0,1fr) auto}.sublist>div select{grid-column:1/-1}}
 
 .contextChoice{display:flex!important;align-items:center;gap:8px;margin:12px 0;color:var(--muted);font-size:10px;font-weight:500!important}.contextChoice input{accent-color:#78cbd8}
+
+.sealLegacy{display:inline-flex;align-items:center;width:max-content;margin:6px 0;padding:7px 10px;border:1px solid rgba(225,189,126,.35);border-radius:8px;background:rgba(225,189,126,.08);color:#e1bd7e;font-size:10px;cursor:pointer}.sealLegacy:disabled{opacity:.5;cursor:not-allowed}

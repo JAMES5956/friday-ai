@@ -142,6 +142,22 @@ export default function KnowledgeArchive() {
     } finally { setBusy(false); }
   }
 
+  async function sealLegacyRecord(id: string) {
+    if (busy || !window.confirm("I have reviewed this legacy archive record. Re-encrypt and seal it for future FRIDAY context?")) return;
+    setBusy(true); setNotice("");
+    try {
+      const response = await fetch("/api/knowledge", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "seal-reviewed", ownerConfirmed: true })
+      });
+      const payload = await response.json();
+      if (!response.ok) { setNotice(payload.error ?? "Could not seal this legacy record."); return; }
+      setNotice("Reviewed archive record sealed with NEXUS integrity protection.");
+      await loadRecords();
+    } catch { setNotice("Could not reach the private archive."); }
+    finally { setBusy(false); }
+  }
+
   async function deleteRecord(id: string) {
     if (busy || !window.confirm("Permanently delete this encrypted archive record? This cannot be undone.")) return;
     setBusy(true);
@@ -217,7 +233,7 @@ export default function KnowledgeArchive() {
               <time>{new Date(record.createdAt).toLocaleString()}</time>
             </div>
             <div className="knowledge-record-actions">
-              {filter === "active" && <><button type="button" disabled={busy} onClick={() => void changeStatus(record.id, "superseded")}>Mark superseded</button><button type="button" disabled={busy} onClick={() => void changeStatus(record.id, "archived")}><Archive size={13} /> Archive</button></>}
+              {record.integrityStatus === "legacy_unsealed" && <button type="button" disabled={busy} onClick={() => void sealLegacyRecord(record.id)}>I reviewed this record — seal it</button>}{filter === "active" && <><button type="button" disabled={busy} onClick={() => void changeStatus(record.id, "superseded")}>Mark superseded</button><button type="button" disabled={busy} onClick={() => void changeStatus(record.id, "archived")}><Archive size={13} /> Archive</button></>}
               {filter !== "archived" && <button type="button" disabled={busy} onClick={() => void deleteRecord(record.id)}>Delete permanently</button>}
               {filter === "archived" && <span><CheckCircle2 size={13} /> Archived</span>}
             </div>

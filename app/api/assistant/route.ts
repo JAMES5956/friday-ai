@@ -322,6 +322,9 @@ export async function POST(request: Request) {
       .select("id, payload_ciphertext").eq("owner_id", owner.user.id).in("id", selectedProjectIds);
     if (projectError) return fail("PROJECT_STORE_UNAVAILABLE", "Could not load selected project context. Apply migration 0008 if it is pending.", 503);
     if ((projectRows ?? []).length !== selectedProjectIds.length) return fail("PROJECT_SELECTION_UNAVAILABLE", "One or more selected projects are unavailable.", 400);
+    if ((projectRows ?? []).some(row => row.integrity_version !== 1 || !row.integrity_digest)) {
+      return fail("PROJECT_SELECTION_UNAVAILABLE", "A selected project is legacy and must be reviewed and sealed before it can enter FRIDAY context.", 409);
+    }
     try {
       selectedProjects = (projectRows ?? []).map(row => {
         const project = JSON.parse(decryptPrivateData(row.payload_ciphertext));

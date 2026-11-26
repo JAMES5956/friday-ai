@@ -90,6 +90,6 @@ export default function MemoryIntegrityPanel() {
       </div>
     </> : null}
     {status ? <p className="nexus-integrity-note" role="status">{status}</p> : null}
-    <p className="nexus-integrity-note">Scope note: this first integrity release covers owner personal memories. Specialist memories, conversations, archive entries and project records will be brought under the same controls in later stages.</p>
+    <p className="nexus-integrity-note">Scope note: this dashboard scans owner personal memories. Specialist memories, archive entries and projects are also signed and verified before model-context use or cross-agent sharing. Conversation history and task-event payloads are not yet covered.</p>
   </section>;
 }

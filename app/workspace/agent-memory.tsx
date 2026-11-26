@@ -55,6 +55,22 @@ export default function AgentMemoryPanel() {
     finally { setBusy(false); }
   }
 
+  async function sealLegacyMemory(id: string) {
+    if (busy || !window.confirm("I have reviewed this specialist memory. Re-encrypt and seal it before it can be shared with agents?")) return;
+    setBusy(true); setStatus("");
+    try {
+      const response = await fetch("/api/agents/" + agentId + "/memory", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "seal-reviewed", ownerConfirmed: true })
+      });
+      const payload = await response.json();
+      if (!response.ok) { setStatus(payload.error?.message ?? "Could not seal this legacy memory."); return; }
+      setStatus("Reviewed specialist memory sealed with NEXUS integrity protection.");
+      await loadMemories();
+    } catch { setStatus("Could not reach the specialist memory service."); }
+    finally { setBusy(false); }
+  }
+
   async function deleteMemory(id: string) {
     if (!window.confirm("Permanently delete this specialist memory?")) return;
     setBusy(true); setStatus("");
@@ -109,7 +125,8 @@ export default function AgentMemoryPanel() {
     <div className="agent-memory-list">
       {memories.length === 0 ? <p className="memory-empty">No saved memories for this agent yet.</p> : memories.map(memory => <article className="memory-item" key={memory.id}>
         <div className="memory-item-heading"><span>{memory.memoryType} · {memory.sensitivity}</span><button type="button" onClick={() => void deleteMemory(memory.id)} disabled={busy}><Trash2 size={13} /> Delete</button></div>
-        <p>{memory.content}</p>
+        <p>{memory.content || "This record is not safe to display because its integrity check failed."}</p>
+        {memory.integrityStatus === "legacy_unsealed" && <button type="button" onClick={() => void sealLegacyMemory(memory.id)} disabled={busy}>I reviewed this memory — seal it</button>}
         <button type="button" onClick={() => void shareMemory(memory)} disabled={busy || memory.sensitivity === "restricted" || recipientId === agentId}><Share2 size={13} /> Share with {agentName(recipientId)} for 30 days</button>
       </article>)}
     </div>

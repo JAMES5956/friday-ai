@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { verifyMemoryIntegrityDigest } from "@/lib/security/encryption";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnerSession } from "@/lib/auth/owner";
 import { specialistAgents } from "@/lib/agents/registry";
@@ -46,9 +47,13 @@ export async function POST(request: Request, route: { params: Promise<{ agentId:
     if (rateError) return fail("SECURITY_LIMITER_UNAVAILABLE", "NEXUS request protection is unavailable.", 503);
     if (!allowed) return fail("RATE_LIMITED", "Too many sharing changes. Wait before trying again.", 429);
     const { data: memory, error: memoryError } = await ctx.supabase.from("agent_memories")
-      .select("id, agent_id, sensitivity, expires_at").eq("id", input.memoryId).eq("owner_id", ctx.owner.user.id).maybeSingle();
+      .select("id, agent_id, sensitivity, expires_at, content_ciphertext, integrity_digest, integrity_version").eq("id", input.memoryId).eq("owner_id", ctx.owner.user.id).maybeSingle();
     if (memoryError) return fail("AGENT_MEMORY_UNAVAILABLE", "Could not verify the source memory.", 503);
     if (!memory || !isUnexpired(memory.expires_at)) return fail("MEMORY_NOT_FOUND", "Source memory was not found or has expired.", 404);
+    if (memory.integrity_version !== 1 || !memory.integrity_digest ||
+        !verifyMemoryIntegrityDigest(ctx.owner.user.id, memory.id, memory.content_ciphertext, memory.integrity_digest, "agent_memory")) {
+      return fail("MEMORY_INTEGRITY_REQUIRED", "Only integrity-verified specialist memories can be shared. Review and replace legacy records first.", 409);
+    }
     if (memory.agent_id === ctx.agent.id) return fail("INVALID_MEMORY_GRANT", "A specialist cannot share memory with itself.", 400);
     if (!canShareMemory(memory.agent_id, ctx.agent.id, memory.sensitivity)) return fail("INVALID_MEMORY_GRANT", "This memory cannot be shared with the selected specialist.", 403);
     const { data: existing, error: existingError } = await ctx.supabase.from("agent_memory_grants")
