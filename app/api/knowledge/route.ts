@@ -96,8 +96,13 @@ export async function POST(request: Request) {
   const { data: allowed, error: rateError } = await context.supabase.rpc("consume_rate_limit", { p_limit: 20 });
   if (rateError) return fail("NEXUS request protection is unavailable.", 503);
   if (!allowed) return fail("Too many archive changes. Try again shortly.", 429);
+  const recordId = randomUUID();
+  let integrityDigest: string;
+  try { integrityDigest = createMemoryIntegrityDigest(context.owner.id, recordId, ciphertext, "knowledge"); }
+  catch { return fail("FRIDAY archive integrity protection is not configured.", 503); }
   const { data, error } = await context.supabase.from("knowledge_records").insert({
-    owner_id: context.owner.id, record_type: input.type, sensitivity, expires_at: expiresAt, payload_ciphertext: ciphertext
+    id: recordId, owner_id: context.owner.id, record_type: input.type, sensitivity,
+    expires_at: expiresAt, payload_ciphertext: ciphertext, integrity_digest: integrityDigest, integrity_version: 1
   }).select("id, record_type, status, sensitivity, expires_at, created_at").single();
   if (error || !data) return fail("Could not save archive record. Check database setup.", 503);
   return NextResponse.json({ record: data }, { status: 201, headers: { "Cache-Control": "no-store" } });
