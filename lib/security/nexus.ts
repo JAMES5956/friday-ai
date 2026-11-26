@@ -13,8 +13,8 @@ const completedActions =
 const approvalPatterns = [
   new RegExp(`^\\s*(?:(?:please|kindly)\\s+)?${sensitiveActions}\\b`, "i"),
   new RegExp(`\\b(?:please|kindly|could you|can you|would you|would you mind|i want you to|i need you to|i would like you to|go ahead and|proceed to)\\s+(?:(?:please|kindly)\\s+)?${sensitiveActions}\\b`, "i"),
-  new RegExp(`\\b(?:i want|i need|i would like|please|kindly|could you|can you|would you|would you mind|go ahead and|proceed to)\\s+(?:to\\s+)?(?:get|have|make)\\s+(?:this|that|it|them|(?:my|our|your|their|the)\\s+(?:\\w+\\s+){0,2}\\w+|(?:location|device|phone|backup|account|password|permissions|data|recording|call)(?:\\s+\\w+){0,2})\\s+${completedActions}\\b`, "i"),
-  new RegExp(`\\b(?:please|kindly|could you|can you|would you)\\s+(?:make sure|ensure)\\s+(?:this|that|it|them|(?:my|our|your|their|the)\\s+(?:\\w+\\s+){0,2}\\w+|(?:location|device|phone|backup|account|password|permissions|data|recording|call)(?:\\s+\\w+){0,2})\\s+(?:is|gets|will be)\\s+${completedActions}\\b`, "i")
+  new RegExp(`\\b(?:i want|i need|i would like|please|kindly|could you|can you|would you|would you mind|go ahead and|proceed to)\\s+(?:to\\s+)?(?:get|have|make)\\s+(?:this|that|it|them|(?:this|that)\\s+\\w+|(?:my|our|your|their|the)\\s+(?:\\w+\\s+){0,2}\\w+|(?:location|device|phone|backup|account|password|permissions|data|recording|call)(?:\\s+\\w+){0,2})\\s+${completedActions}\\b`, "i"),
+  new RegExp(`\\b(?:please|kindly|could you|can you|would you)\\s+(?:make sure|ensure)\\s+(?:this|that|it|them|(?:this|that)\\s+\\w+|(?:my|our|your|their|the)\\s+(?:\\w+\\s+){0,2}\\w+|(?:location|device|phone|backup|account|password|permissions|data|recording|call)(?:\\s+\\w+){0,2})\\s+(?:is|gets|will be)\\s+${completedActions}\\b`, "i")
 ];
 
 export function evaluateRequestForApproval(message: string): SecurityDecision {
