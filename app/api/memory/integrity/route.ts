@@ -57,7 +57,7 @@ export async function GET() {
     const inspect = (rows: Array<Record<string, unknown>>, category: (row: Record<string, unknown>) => string,
       ciphertextField: string, domain: string, sealable = false) => {
       for (const row of rows) {
-        let status: "verified"|"authenticated"|"legacy_unsealed"|"tampered"|"unreadable";
+        let status: "verified"|"legacy_unsealed"|"tampered"|"unreadable";
         const ciphertext = row[ciphertextField];
         const hasDigest = row.integrity_digest !== null || row.integrity_version !== null;
         if (typeof row.id !== "string" || typeof ciphertext !== "string") status = "unreadable";
