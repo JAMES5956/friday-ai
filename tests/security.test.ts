@@ -80,6 +80,16 @@ describe("NEXUS approval gate", () => {
     expect(evaluateRequestForApproval("I need to get the report submitted").requiresApproval).toBe(true);
   });
 
+  it("requires approval for device, location, monitoring and emergency-control requests", () => {
+    expect(evaluateRequestForApproval("Lock my phone now").requiresApproval).toBe(true);
+    expect(evaluateRequestForApproval("Please track this device").requiresApproval).toBe(true);
+    expect(evaluateRequestForApproval("Activate protocol 5").requiresApproval).toBe(true);
+    expect(evaluateRequestForApproval("Disable location sharing").requiresApproval).toBe(true);
+    expect(evaluateRequestForApproval("Record this call").requiresApproval).toBe(true);
+    expect(evaluateRequestForApproval("Install this application").requiresApproval).toBe(true);
+    expect(evaluateRequestForApproval("Overwrite the backup").requiresApproval).toBe(true);
+  });
+
   it("checks task titles as well as descriptions before queueing", () => {
     expect(evaluateTaskForApproval("Transfer funds", "Prepare a short note").requiresApproval).toBe(true);
     expect(evaluateTaskForApproval("Routine research", "Explain how transfers work").allowed).toBe(true);
