@@ -18,7 +18,7 @@ The repository now contains:
 - Owner-controlled specialist memory management, expiring cross-agent sharing grants, revocation, and restricted-memory exclusion.
 - Owner memory sensitivity labels, optional retention expiry, provenance references and strict exclusion of restricted or expired memories from model context.
 - Encrypted owner-only knowledge archive and decision journal with workspace capture, server-side search, source citations, rationale, retention, status lifecycle and owner-controlled archival/deletion. Up to five active routine/internal records can be explicitly selected for one FRIDAY message; restricted, expired and archived records are excluded.
-- Encrypted Project Continuity workspace for owner-managed project objectives, status, priority, specialist ownership, dated milestones and tasks, progress updates and blockers. Project records are owner-scoped and are not included in model context automatically.
+- Encrypted Project Continuity workspace for owner-managed project objectives, status, priority, specialist ownership, dated milestones and tasks, progress updates and blockers. Project records are owner-scoped and are not included in model context automatically; the owner may explicitly select up to three active projects for one message, after which the selection clears.
 - FRIDAY can review completed specialist outputs, challenge assumptions and save its synthesis into the owner conversation history.
 - Automated lint, TypeScript and production-build checks.
 

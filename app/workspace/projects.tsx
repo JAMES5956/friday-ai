@@ -87,8 +87,8 @@ export default function ProjectsPanel() {
     finally { setBusy(false); }
   }
 
-  async function updateProject(project: ProjectRecord, payload: ProjectPayload) {
-    if (busy) return;
+  async function updateProject(project: ProjectRecord, payload: ProjectPayload): Promise<boolean> {
+    if (busy) return false;
     setBusy(true); setNotice("");
     try {
       const response = await fetch("/api/projects", {
@@ -96,10 +96,16 @@ export default function ProjectsPanel() {
         body: JSON.stringify({ id: project.id, payload })
       });
       const result = await response.json();
-      if (!response.ok) { setNotice(result.error?.message ?? "Could not update project."); return; }
+      if (!response.ok) { setNotice(result.error?.message ?? "Could not update project."); return false; }
       setProjects(current => current.map(item => item.id === project.id ? { ...item, ...result.project } : item));
+      if (payload.status === "archived") {
+        const next = selectedForContext.filter(id => id !== project.id);
+        setSelectedForContext(next);
+        window.dispatchEvent(new CustomEvent("friday:project-context", { detail: next }));
+      }
       setNotice("Project continuity record updated.");
-    } catch { setNotice("Could not reach the project service."); }
+      return true;
+    } catch { setNotice("Could not reach the project service."); return false; }
     finally { setBusy(false); }
   }
 
@@ -110,8 +116,9 @@ export default function ProjectsPanel() {
       ...project.payload,
       progressUpdates: [{ id: uid(), body, createdAt: new Date().toISOString(), agentId: "friday" }, ...project.payload.progressUpdates].slice(0, 100)
     };
-    await updateProject(project, next);
-    setProgressDraft(current => ({ ...current, [project.id]: "" }));
+    if (await updateProject(project, next)) {
+      setProgressDraft(current => ({ ...current, [project.id]: "" }));
+    }
   }
 
   return <section className={styles.panel}>
