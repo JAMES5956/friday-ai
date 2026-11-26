@@ -96,13 +96,13 @@ export async function GET() {
     };
     const signature = createBackupSignature(context.owner.id, JSON.stringify(unsignedEnvelope));
     const backup = { ...unsignedEnvelope, signature };
+    const body = JSON.stringify(backup);
+    if (new TextEncoder().encode(body).byteLength > MAX_BACKUP_BYTES) return fail("Backup exceeds the safe export size limit.", 413);
     const { error: auditError } = await context.supabase.from("security_audit_events").insert({
       user_id: context.owner.id, event_type: "owner_backup_exported", severity: "info",
       details: { recordCount: Object.values(counts).reduce((sum, count) => sum + count, 0), legacyUnsealed: integrityReport.legacyUnsealed }
     });
     if (auditError) return fail("Backup export was stopped because NEXUS could not record its audit event.", 503);
-    const body = JSON.stringify(backup);
-    if (new TextEncoder().encode(body).byteLength > MAX_BACKUP_BYTES) return fail("Backup exceeds the safe export size limit.", 413);
     return new NextResponse(body, {
       status: 200,
       headers: {
@@ -190,7 +190,7 @@ export async function POST(request: Request) {
         ? "Recovery is blocked: NEXUS found tampered, unreadable or cross-owner records."
         : readiness === "review_required"
           ? "Backup signature is valid. Review legacy unsigned records before attempting recovery."
-          : "Backup signature and encrypted records passed verification. This was a dry run; no database rows were changed."
+          : "Backup signature and encrypted records passed verification. This was a dry run; no application records were restored, replaced or deleted. NEXUS recorded a verification audit event."
     }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return fail("Backup verification could not be completed.", 503);
