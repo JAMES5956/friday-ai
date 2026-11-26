@@ -98,12 +98,22 @@ function inspectTables(ownerId: string, tables: BackupTables): IntegrityReport {
   inspectSigned("knowledge_records", tables.knowledge_records ?? [], "payload_ciphertext", "knowledge");
   inspectSigned("project_records", tables.project_records ?? [], "payload_ciphertext", "project");
 
-  for (const row of tables.messages ?? []) decrypt("messages", row, "content");
+  // Conversations and specialist work must pass the same owner/record/domain-bound
+  // signature checks as the other encrypted stores before any backup is exported
+  // or considered recoverable. Unsigned historic rows remain review-required.
+  inspectSigned("messages", tables.messages ?? [], "content", "message");
+  inspectSigned("agent_tasks", tables.agent_tasks ?? [], "task_ciphertext", "agent_task",
+    "task_integrity_digest", "task_integrity_version");
   for (const row of tables.agent_tasks ?? []) {
-    decrypt("agent_tasks", row, "task_ciphertext");
-    decrypt("agent_tasks", row, "result_ciphertext");
+    if (row.result_ciphertext == null) continue;
+    inspectSigned("agent_tasks", [row], "result_ciphertext", "agent_task_result",
+      "result_integrity_digest", "result_integrity_version");
   }
-  for (const row of tables.agent_task_events ?? []) decrypt("agent_task_events", row, "details_ciphertext");
+  for (const row of tables.agent_task_events ?? []) {
+    if (row.details_ciphertext == null) continue;
+    inspectSigned("agent_task_events", [row], "details_ciphertext", "agent_task_event",
+      "details_integrity_digest", "details_integrity_version");
+  }
 
   return report;
 }
