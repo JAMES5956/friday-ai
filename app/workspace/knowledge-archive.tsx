@@ -186,7 +186,7 @@ export default function KnowledgeArchive() {
         ))}
       </div>
       {notice && <p className="workspace-status" role="status">{notice}</p>}
-      <p className="knowledge-safety-note"><ShieldCheck size={14} /> Archive payloads are encrypted before storage. Restricted records are never intended for model context. FRIDAY does not automatically treat archived notes as verified facts.</p>
+      <p className="knowledge-safety-note"><ShieldCheck size={14} /> Archive payloads are encrypted before storage. Restricted records are never intended for model context. Automatic archive retrieval into AI conversations is not enabled yet; archived notes are not treated as verified facts.</p>
     </section>
   );
 }
