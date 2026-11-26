@@ -328,3 +328,5 @@ h1 span { color: var(--cyan); text-shadow: 0 0 35px rgba(112,228,244,.22); }
 .knowledge-context-choice{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:10px;white-space:nowrap}
 .knowledge-context-choice input{accent-color:#78cbd8}
 @media(max-width:520px){.knowledge-context-toolbar{align-items:flex-start;flex-direction:column}.knowledge-record-flags{justify-items:start}}
+
+.knowledge-context-status{margin:8px 0;color:#8bd6df;font-size:11px;line-height:1.5}
