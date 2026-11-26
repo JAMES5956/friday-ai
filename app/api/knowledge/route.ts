@@ -41,14 +41,16 @@ export async function GET(request: Request) {
   try {
     const now = Date.now();
     const records = (data ?? []).map(row => {
-      if (row.integrity_version !== 1 || typeof row.integrity_digest !== "string" ||
-          !verifyMemoryIntegrityDigest(context.owner.id, row.id, row.payload_ciphertext, row.integrity_digest, "knowledge")) {
+      const hasIntegrity = row.integrity_digest !== null || row.integrity_version !== null;
+      if (hasIntegrity && (row.integrity_version !== 1 || typeof row.integrity_digest !== "string" ||
+          !verifyMemoryIntegrityDigest(context.owner.id, row.id, row.payload_ciphertext, row.integrity_digest, "knowledge"))) {
         throw new Error("Knowledge archive integrity mismatch");
       }
       return {
         id: row.id, type: row.record_type, status: row.status, sensitivity: row.sensitivity,
         expiresAt: row.expires_at, createdAt: row.created_at, updatedAt: row.updated_at,
         expired: Boolean(row.expires_at && new Date(row.expires_at).getTime() <= now),
+        integrityStatus: hasIntegrity ? "verified" : "legacy_unsealed",
         payload: JSON.parse(decryptPrivateData(row.payload_ciphertext))
       };
     });
