@@ -7,6 +7,7 @@ import { evaluateRequestForApproval } from "@/lib/security/nexus";
 import { decryptPrivateData, encryptPrivateData } from "@/lib/security/encryption";
 import { recommendSpecialist } from "@/lib/agents/router";
 import { isMemoryAvailableToModel } from "@/lib/memory/policy";
+import { validateProjectPayload } from "@/lib/projects/policy";
 
 const MAX_BODY_BYTES = 16_384;
 const MAX_MESSAGE_LENGTH = 4_000;
@@ -316,7 +317,7 @@ export async function POST(request: Request) {
     try {
       selectedProjects = (projectRows ?? []).map(row => {
         const project = JSON.parse(decryptPrivateData(row.payload_ciphertext));
-        if (!project || typeof project.title !== "string" || typeof project.purpose !== "string" || project.status === "archived") throw new Error("Unavailable project");
+        if (!validateProjectPayload(project) || project.status === "archived") throw new Error("Unavailable project");
         return JSON.stringify({ title: project.title, purpose: project.purpose, status: project.status, priority: project.priority, milestones: project.milestones, tasks: project.tasks, progressUpdates: Array.isArray(project.progressUpdates) ? project.progressUpdates.slice(0, 5) : [], blockers: project.blockers });
       });
       if (selectedProjects.join("").length > 10_000) return fail("PROJECT_CONTEXT_TOO_LARGE", "Selected project context is too large. Choose fewer or shorter projects.", 413);
