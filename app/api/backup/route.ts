@@ -117,6 +117,9 @@ export async function GET() {
   try {
     const context = await ownerContext();
     if ("response" in context) return context.response;
+    const { data: allowed, error: rateError } = await context.supabase.rpc("consume_rate_limit", { p_limit: 5 });
+    if (rateError) return fail("NEXUS rate protection is unavailable.", 503);
+    if (!allowed) return fail("Too many backup operations. Wait before trying again.", 429);
     const tables: BackupTables = {};
     const counts: Record<string, number> = {};
 
@@ -171,7 +174,12 @@ export async function POST(request: Request) {
   try {
     const context = await ownerContext();
     if ("response" in context) return context.response;
+    const { data: allowed, error: rateError } = await context.supabase.rpc("consume_rate_limit", { p_limit: 5 });
+    if (rateError) return fail("NEXUS rate protection is unavailable.", 503);
+    if (!allowed) return fail("Too many backup operations. Wait before trying again.", 429);
     if (!(request.headers.get("content-type") ?? "").toLowerCase().includes("application/json")) return fail("Send an application/json backup file.", 415);
+    const declaredLength = Number(request.headers.get("content-length") ?? 0);
+    if (declaredLength > MAX_BACKUP_BYTES) return fail("Backup file exceeds the 20 MB verification limit.", 413);
     const raw = await request.text();
     if (new TextEncoder().encode(raw).byteLength > MAX_BACKUP_BYTES) return fail("Backup file exceeds the 20 MB verification limit.", 413);
 
