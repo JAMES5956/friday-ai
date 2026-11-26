@@ -38,6 +38,7 @@ export default function KnowledgeArchive() {
   const [filter, setFilter] = useState<"active" | "superseded" | "archived">("active");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedForContext, setSelectedForContext] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
@@ -63,6 +64,22 @@ export default function KnowledgeArchive() {
   }, [filter, searchQuery]);
 
   useEffect(() => { void loadRecords(); }, [loadRecords]);
+  useEffect(() => {
+    const clearSelection = () => setSelectedForContext([]);
+    window.addEventListener("friday:knowledge-context-cleared", clearSelection);
+    return () => window.removeEventListener("friday:knowledge-context-cleared", clearSelection);
+  }, []);
+
+  function toggleContextRecord(id: string, checked: boolean) {
+    setSelectedForContext(current => {
+      if (checked) return current.includes(id) || current.length >= 5 ? current : [...current, id];
+      return current.filter(item => item !== id);
+    });
+  }
+
+  function attachSelectedToNextMessage() {
+    window.dispatchEvent(new CustomEvent("friday:knowledge-context", { detail: selectedForContext }));
+  }
 
   async function saveRecord(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -131,6 +148,7 @@ export default function KnowledgeArchive() {
       });
       const payload = await response.json();
       if (!response.ok) { setNotice(payload.error ?? "Could not delete this record."); return; }
+      setSelectedForContext(current => current.filter(item => item !== id));
       await loadRecords();
     } catch {
       setNotice("Could not reach the private archive.");
@@ -165,6 +183,10 @@ export default function KnowledgeArchive() {
         <button type="submit">Search</button>
         {searchQuery && <button type="button" onClick={() => { setSearchInput(""); setSearchQuery(""); }}>Clear</button>}
       </form>
+      <div className="knowledge-context-toolbar">
+        <span>{selectedForContext.length} eligible record{selectedForContext.length === 1 ? "" : "s"} selected for the next message</span>
+        <button type="button" disabled={selectedForContext.length === 0} onClick={attachSelectedToNextMessage}>Use in next FRIDAY message</button>
+      </div>
       <div className="knowledge-archive-toolbar">
         <div className="knowledge-filter" role="group" aria-label="Archive status">
           {(["active", "superseded", "archived"] as const).map(value => <button type="button" key={value} className={filter === value ? "selected" : ""} onClick={() => setFilter(value)}>{value}</button>)}
@@ -176,7 +198,10 @@ export default function KnowledgeArchive() {
           <article className="knowledge-record" key={record.id}>
             <div className="knowledge-record-heading">
               <div><span className="knowledge-record-type">{record.type === "decision" ? "DECISION" : "KNOWLEDGE"} · {record.sensitivity.toUpperCase()}</span><h3>{record.payload.title}</h3></div>
-              {record.expired && <span className="knowledge-expired">EXPIRED</span>}
+              <div className="knowledge-record-flags">
+                {record.expired && <span className="knowledge-expired">EXPIRED</span>}
+                {filter === "active" && record.status === "active" && record.sensitivity !== "restricted" && !record.expired && <label className="knowledge-context-choice"><input type="checkbox" checked={selectedForContext.includes(record.id)} onChange={event => toggleContextRecord(record.id, event.target.checked)} disabled={!selectedForContext.includes(record.id) && selectedForContext.length >= 5} /> Include in next message</label>}
+              </div>
             </div>
             <p>{record.payload.body}</p>
             {record.payload.rationale && <p className="knowledge-rationale"><strong>Rationale:</strong> {record.payload.rationale}</p>}
@@ -194,7 +219,7 @@ export default function KnowledgeArchive() {
         ))}
       </div>
       {notice && <p className="workspace-status" role="status">{notice}</p>}
-      <p className="knowledge-safety-note"><ShieldCheck size={14} /> Archive payloads are encrypted before storage. Restricted records are never intended for model context. Automatic archive retrieval into AI conversations is not enabled yet; archived notes are not treated as verified facts.</p>
+      <p className="knowledge-safety-note"><ShieldCheck size={14} /> Archive payloads are encrypted before storage. Only records you explicitly select can be attached to your next message; restricted, expired and archived records are excluded. Selected archive text is treated as untrusted context, never as instructions.</p>
     </section>
   );
 }
