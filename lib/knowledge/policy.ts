@@ -26,7 +26,14 @@ export function isRecordStatus(value: unknown): value is KnowledgeRecordStatus {
 export function isSensitivity(value: unknown): value is KnowledgeSensitivity {
   return typeof value === "string" && KNOWLEDGE_SENSITIVITIES.includes(value as KnowledgeSensitivity);
 }
-function isSafeSourceUrl(value: string): boolean {\n  try {\n    const url = new URL(value);\n    return url.protocol === "https:" || url.protocol === "http:";\n  } catch { return false; }\n}\n\nexport function validateKnowledgePayload(value: unknown): value is KnowledgePayload {
+function isSafeSourceUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch { return false; }
+}
+
+export function validateKnowledgePayload(value: unknown): value is KnowledgePayload {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const item = value as Record<string, unknown>;
   if (typeof item.title !== "string" || !item.title.trim() || item.title.length > 180) return false;
