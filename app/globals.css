@@ -314,3 +314,8 @@ h1 span { color: var(--cyan); text-shadow: 0 0 35px rgba(112,228,244,.22); }
 .knowledge-safety-note{display:flex;align-items:flex-start;gap:7px;margin-top:16px;color:var(--muted);font-size:10px;line-height:1.6}
 .knowledge-safety-note svg{flex-shrink:0;color:#82d7b1}
 @media(max-width:650px){.knowledge-archive{padding:16px}.knowledge-form-grid{grid-template-columns:1fr}.knowledge-record-heading{flex-direction:column}}
+
+
+.knowledge-search{display:flex;gap:8px;margin:14px 0 10px}
+.knowledge-search input{flex:1;min-width:0;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--text);padding:10px 12px;font:inherit;font-size:12px}
+.knowledge-search button{border:1px solid var(--line);border-radius:9px;background:rgba(112,228,244,.1);color:#a8edf4;padding:8px 12px;font-size:11px;cursor:pointer}
