@@ -71,10 +71,11 @@ export default function KnowledgeArchive() {
   }, []);
 
   function toggleContextRecord(id: string, checked: boolean) {
-    setSelectedForContext(current => {
-      if (checked) return current.includes(id) || current.length >= 5 ? current : [...current, id];
-      return current.filter(item => item !== id);
-    });
+    const next = checked
+      ? selectedForContext.includes(id) || selectedForContext.length >= 5 ? selectedForContext : [...selectedForContext, id]
+      : selectedForContext.filter(item => item !== id);
+    setSelectedForContext(next);
+    window.dispatchEvent(new CustomEvent("friday:knowledge-context", { detail: next }));
   }
 
   function attachSelectedToNextMessage() {
@@ -132,7 +133,9 @@ export default function KnowledgeArchive() {
       });
       const payload = await response.json();
       if (!response.ok) { setNotice(payload.error ?? "Could not update this record."); return; }
-      setSelectedForContext(current => current.filter(item => item !== id));
+      const nextSelection = selectedForContext.filter(item => item !== id);
+      setSelectedForContext(nextSelection);
+      window.dispatchEvent(new CustomEvent("friday:knowledge-context", { detail: nextSelection }));
       await loadRecords();
     } catch {
       setNotice("Could not reach the private archive.");
