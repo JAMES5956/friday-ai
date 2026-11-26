@@ -22,7 +22,7 @@ type SpeechWindow = Window & {
 
 type ChatItem = { role: "user" | "assistant"; content: string };
 type ConversationItem = { id: string; title: string; updated_at: string };
-type MemoryItem = { id: string; category: string; content: string; created_at: string };
+type MemoryItem = { id: string; category: string; content: string; sensitivity: "routine" | "internal" | "restricted"; expires_at: string | null; source_reference: string | null; created_at: string };
 type SecurityEvent = { id: string; event_type: string; severity: string; created_at: string };
 type SpecialistRecommendation = { agentId: string; name: string; role: string; confidence: "high" | "moderate"; reason: string };
 
@@ -36,6 +36,8 @@ export default function WorkspaceClient() {
   const [status, setStatus] = useState("");
   const [memories, setMemories] = useState<MemoryItem[]>([]);
   const [memoryDraft, setMemoryDraft] = useState("");
+  const [memorySensitivity, setMemorySensitivity] = useState<"routine" | "internal" | "restricted">("internal");
+  const [memoryExpiry, setMemoryExpiry] = useState("never");
   const [memoryBusy, setMemoryBusy] = useState(false);
   const [securityEvents, setSecurityEvents] = useState<SecurityEvent[]>([]);
   const [listening, setListening] = useState(false);
@@ -320,7 +322,7 @@ export default function WorkspaceClient() {
       const response = await fetch("/api/memory", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, category: "owner_note" })
+        body: JSON.stringify({ content, category: "owner_note", sensitivity: memorySensitivity, expiresInDays: memoryExpiry === "never" ? null : Number(memoryExpiry) })
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -406,12 +408,16 @@ export default function WorkspaceClient() {
         </div>
         <form className="memory-form" onSubmit={saveMemory}>
           <textarea value={memoryDraft} onChange={event => setMemoryDraft(event.target.value)} placeholder="Add a fact or note for FRIDAY to retain..." rows={3} maxLength={10000} />
+          <div className="agent-memory-controls">
+            <label>Privacy<select value={memorySensitivity} onChange={event => setMemorySensitivity(event.target.value as typeof memorySensitivity)}><option value="routine">Routine — may be used in context</option><option value="internal">Internal — may be used in context</option><option value="restricted">Restricted — owner only, never sent to AI models</option></select></label>
+            <label>Retention<select value={memoryExpiry} onChange={event => setMemoryExpiry(event.target.value)}><option value="never">Keep until I delete it</option><option value="30">30 days</option><option value="90">90 days</option><option value="365">1 year</option></select></label>
+          </div>
           <button type="submit" disabled={!memoryDraft.trim() || memoryBusy}><Plus size={15} /> Save memory</button>
         </form>
         <div className="memory-list">
           {memories.length === 0
             ? <p className="memory-empty">No saved notes yet. Database configuration is required.</p>
-            : memories.map(memory => <article className="memory-item" key={memory.id}><div className="memory-item-heading"><span>{memory.category}</span><button type="button" onClick={() => void deleteMemory(memory.id)}>Delete</button></div><p>{memory.content}</p></article>)}
+            : memories.map(memory => <article className="memory-item" key={memory.id}><div className="memory-item-heading"><span>{memory.category} · {memory.sensitivity}</span><button type="button" onClick={() => void deleteMemory(memory.id)}>Delete</button></div><p>{memory.content}</p>{memory.expires_at && <small>Expires {new Date(memory.expires_at).toLocaleDateString()}</small>}</article>)}
         </div>
       </aside>
     </div>
