@@ -29,6 +29,22 @@ export function verifyMemoryIntegrityDigest(ownerId: string, memoryId: string, c
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
+export function createBackupSignature(ownerId: string, canonicalPayload: string) {
+  const key = getEncryptionKey();
+  const backupKey = createHmac("sha256", key).update("friday:backup-signature:v1").digest();
+  return createHmac("sha256", backupKey)
+    .update(ownerId).update("\\0")
+    .update(canonicalPayload)
+    .digest("hex");
+}
+
+export function verifyBackupSignature(ownerId: string, canonicalPayload: string, signature: string) {
+  if (!/^[a-f0-9]{64}$/.test(signature)) return false;
+  const expected = Buffer.from(createBackupSignature(ownerId, canonicalPayload), "hex");
+  const actual = Buffer.from(signature, "hex");
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
 export function encryptPrivateData(plainText: string) {
   const key = getEncryptionKey();
   const iv = randomBytes(12);

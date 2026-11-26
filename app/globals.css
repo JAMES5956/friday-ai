@@ -348,3 +348,17 @@ h1 span { color: var(--cyan); text-shadow: 0 0 35px rgba(112,228,244,.22); }
 .nexus-integrity-actions button:disabled{opacity:.45;cursor:not-allowed}
 .nexus-integrity-note{color:var(--muted);font-size:10px;line-height:1.6}
 @media(max-width:620px){.nexus-memory-integrity{padding:16px}.nexus-integrity-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.nexus-integrity-row{align-items:flex-start;flex-wrap:wrap}.nexus-integrity-status{margin-left:28px}}
+
+.nexus-backup-panel{margin:24px 0;padding:24px;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.025)}
+.nexus-backup-actions{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}
+.nexus-backup-actions button,.nexus-backup-upload{display:inline-flex;align-items:center;gap:8px;padding:10px 13px;border:1px solid rgba(112,228,244,.3);border-radius:9px;background:rgba(112,228,244,.1);color:#a8edf4;font-size:11px;cursor:pointer}
+.nexus-backup-actions button:disabled,.nexus-backup-upload:has(input:disabled){opacity:.5;cursor:not-allowed}
+.nexus-backup-upload{position:relative;overflow:hidden}.nexus-backup-upload input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.nexus-backup-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:16px 0}
+.nexus-backup-stats div{padding:12px;border:1px solid var(--line);border-radius:10px;background:rgba(3,11,19,.4)}
+.nexus-backup-stats strong{display:block;color:#e8f7fc;font-size:20px}.nexus-backup-stats span{color:var(--muted);font:8px 'DM Mono',monospace;text-transform:uppercase}
+.nexus-backup-readiness{display:flex;align-items:center;gap:8px;font:10px 'DM Mono',monospace;text-transform:uppercase}
+.nexus-backup-readiness.ready{color:#82d7b1}.nexus-backup-readiness.review_required{color:#e1bd7e}.nexus-backup-readiness.blocked{color:#ff9a9a}
+.nexus-backup-issues{padding-left:20px;color:#ffaaaa;font-size:10px;line-height:1.7}
+.nexus-backup-note{color:var(--muted);font-size:10px;line-height:1.65;overflow-wrap:anywhere}
+@media(max-width:620px){.nexus-backup-panel{padding:16px}.nexus-backup-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
