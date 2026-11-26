@@ -8,6 +8,7 @@ type MemoryIntegrityRecord = {
   category: string;
   updatedAt: string;
   status: "verified" | "legacy_unsealed" | "tampered" | "unreadable";
+  sealable: boolean;
 };
 type IntegrityReport = {
   scanned: number;
@@ -73,11 +74,11 @@ export default function MemoryIntegrityPanel() {
         <div className="nexus-integrity-stat"><strong>{counts.tampered}</strong><span>Tampered</span></div>
         <div className="nexus-integrity-stat"><strong>{counts.unreadable}</strong><span>Unreadable</span></div>
       </div>
-      <p className="nexus-integrity-note">Scanned {report.scanned} retained personal memories (maximum 100 per scan). Legacy records are not yet signed. NEXUS never overwrites a tampered or unreadable record.</p>
+      <p className="nexus-integrity-note">Scanned {report.scanned} records across personal memories, specialist memories, the knowledge archive and projects (up to 100 per store). Legacy records are not yet signed. NEXUS never overwrites a tampered or unreadable record.</p>
       <div className="nexus-integrity-list">
         {report.records.map(record => <div className="nexus-integrity-row" key={record.id}>
           <label>
-            {record.status === "legacy_unsealed" ? <input type="checkbox" checked={selected.includes(record.id)} onChange={event => toggle(record.id, event.target.checked)} disabled={busy || (!selected.includes(record.id) && selected.length >= 25)} /> : <span aria-hidden="true">{record.status === "verified" ? <ShieldCheck size={15} /> : <ShieldAlert size={15} />}</span>}
+            {record.sealable ? <input type="checkbox" checked={selected.includes(record.id)} onChange={event => toggle(record.id, event.target.checked)} disabled={busy || (!selected.includes(record.id) && selected.length >= 25)} /> : <span aria-hidden="true">{record.status === "verified" ? <ShieldCheck size={15} /> : <ShieldAlert size={15} />}</span>}
             <span>{record.category}<small>Updated {new Date(record.updatedAt).toLocaleDateString()}</small></span>
           </label>
           <span className={"nexus-integrity-status " + record.status}>{record.status.replace("_", " ")}</span>
@@ -90,6 +91,6 @@ export default function MemoryIntegrityPanel() {
       </div>
     </> : null}
     {status ? <p className="nexus-integrity-note" role="status">{status}</p> : null}
-    <p className="nexus-integrity-note">Scope note: this dashboard scans owner personal memories. Specialist memories, archive entries and projects are also signed and verified before model-context use or cross-agent sharing. Conversation history and task-event payloads are not yet covered.</p>
+    <p className="nexus-integrity-note">Legacy specialist, archive and project records are reported for review but are not bulk-sealed here. Only explicitly selected personal memories can be sealed through this panel. Conversation history and task-event payloads are not yet covered.</p>
   </section>;
 }
