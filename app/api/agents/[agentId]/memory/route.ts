@@ -32,9 +32,16 @@ export async function GET(_request: Request, route: { params: Promise<{ agentId:
       .order("updated_at", { ascending: false }).limit(100);
     if (error) return fail("AGENT_MEMORY_UNAVAILABLE", "Could not load this specialist's private memory. Apply migration 0003.", 503);
     try {
-      const memories = (data ?? []).map(row => ({ id: row.id, memoryType: row.memory_type, sensitivity: row.sensitivity,
-        content: decryptPrivateData(row.content_ciphertext), sourceAgentId: row.source_agent_id,
-        expiresAt: row.expires_at, createdAt: row.created_at, updatedAt: row.updated_at }));
+      const memories = (data ?? []).map(row => {
+        const hasIntegrity = row.integrity_digest !== null || row.integrity_version !== null;
+        if (hasIntegrity && (row.integrity_version !== 1 || typeof row.integrity_digest !== "string" ||
+            !verifyMemoryIntegrityDigest(ctx.owner.user.id, row.id, row.content_ciphertext, row.integrity_digest, "agent_memory"))) {
+          throw new Error("Specialist memory integrity mismatch");
+        }
+        return { id: row.id, memoryType: row.memory_type, sensitivity: row.sensitivity,
+          content: decryptPrivateData(row.content_ciphertext), integrityStatus: hasIntegrity ? "verified" : "legacy_unsealed",
+          sourceAgentId: row.source_agent_id, expiresAt: row.expires_at, createdAt: row.created_at, updatedAt: row.updated_at };
+      });
       return NextResponse.json({ memories }, { headers: { "Cache-Control": "no-store" } });
     } catch { return fail("PRIVATE_DATA_UNREADABLE", "Specialist memory could not be decrypted. Check the encryption key.", 503); }
   } catch { return fail("AGENT_MEMORY_UNAVAILABLE", "Specialist memory service is not configured.", 503); }
@@ -60,9 +67,13 @@ export async function POST(request: Request, route: { params: Promise<{ agentId:
     if (rateError) return fail("SECURITY_LIMITER_UNAVAILABLE", "NEXUS request protection is unavailable.", 503);
     if (!allowed) return fail("RATE_LIMITED", "Too many memory changes. Wait before trying again.", 429);
     const expiresAt = typeof input.expiresInDays === "number" ? new Date(Date.now() + input.expiresInDays * 86400000).toISOString() : null;
+    const memoryId = randomUUID();
+    const ciphertext = encryptPrivateData(input.content.trim());
+    const integrityDigest = createMemoryIntegrityDigest(owner.user.id, memoryId, ciphertext, "agent_memory");
     const { data, error } = await supabase.from("agent_memories").insert({
-      owner_id: owner.user.id, agent_id: agent.id, memory_type: memoryType, sensitivity,
-      content_ciphertext: encryptPrivateData(input.content.trim()), source_agent_id: "friday", expires_at: expiresAt
+      id: memoryId, owner_id: owner.user.id, agent_id: agent.id, memory_type: memoryType, sensitivity,
+      content_ciphertext: ciphertext, integrity_digest: integrityDigest, integrity_version: 1,
+      source_agent_id: "friday", expires_at: expiresAt
     }).select("id, memory_type, sensitivity, created_at, expires_at").single();
     if (error || !data) return fail("AGENT_MEMORY_SAVE_FAILED", "Could not save this encrypted memory.", 503);
     const { error: auditError } = await supabase.from("security_audit_events").insert({
