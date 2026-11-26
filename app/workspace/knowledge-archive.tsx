@@ -152,7 +152,9 @@ export default function KnowledgeArchive() {
       });
       const payload = await response.json();
       if (!response.ok) { setNotice(payload.error ?? "Could not delete this record."); return; }
-      setSelectedForContext(current => current.filter(item => item !== id));
+      const nextSelection = selectedForContext.filter(item => item !== id);
+      setSelectedForContext(nextSelection);
+      window.dispatchEvent(new CustomEvent("friday:knowledge-context", { detail: nextSelection }));
       await loadRecords();
     } catch {
       setNotice("Could not reach the private archive.");
