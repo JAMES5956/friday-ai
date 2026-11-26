@@ -15,7 +15,7 @@ describe("knowledge archive policy", () => {
     expect(validateKnowledgePayload({ title: "Decision", body: "Proceed after review.", rationale: "Risk is acceptable.", confidence: 0.8 })).toBe(true);
     expect(validateKnowledgePayload({ title: "", body: "Missing title" })).toBe(false);
     expect(validateKnowledgePayload({ title: "Bad confidence", body: "Body", confidence: 2 })).toBe(false);
-    expect(validateKnowledgePayload({ title: "Bad source", body: "Body", sources: [{ label: "Source", url: 42 }] })).toBe(false);
+    expect(validateKnowledgePayload({ title: "Bad source", body: "Body", sources: [{ label: "Source", url: 42 }] })).toBe(false);\n    expect(validateKnowledgePayload({ title: "Unsafe source", body: "Body", sources: [{ label: "Source", url: "javascript:alert(1)" }] })).toBe(false);\n    expect(validateKnowledgePayload({ title: "Safe source", body: "Body", sources: [{ label: "Source", url: "https://example.com/report" }] })).toBe(true);
   });
   it("supports never-expire and bounded retention", () => {
     expect(getArchiveExpiry("never")).toBeNull();
