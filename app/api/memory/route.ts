@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnerSession } from "@/lib/auth/owner";
 import { decryptPrivateData, encryptPrivateData } from "@/lib/security/encryption";
+import { getMemoryExpiry, isMemorySensitivity } from "@/lib/memory/policy";
 
 async function getDatabaseClient() {
   try {
@@ -36,7 +37,7 @@ export async function GET() {
   if (!supabase) return NextResponse.json({ error: "Private database access is not configured." }, { status: 503 });
   const { data, error } = await supabase
     .from("memories")
-    .select("id, category, content, source, confidence, retained, created_at, updated_at")
+    .select("id, category, content, source, confidence, retained, sensitivity, expires_at, source_reference, last_accessed_at, created_at, updated_at")
     .eq("user_id", auth.user.id)
     .eq("retained", true)
     .order("updated_at", { ascending: false })
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
   if (new TextEncoder().encode(rawBody).byteLength > 16_384) {
     return NextResponse.json({ error: "Request is too large." }, { status: 413 });
   }
-  let payload: { content?: unknown; category?: unknown };
+  let payload: { content?: unknown; category?: unknown; sensitivity?: unknown; expiresInDays?: unknown; sourceReference?: unknown };
   try {
     const parsed: unknown = JSON.parse(rawBody);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -91,6 +92,13 @@ export async function POST(request: Request) {
   const category = typeof payload.category === "string" && /^[a-z0-9_-]{1,40}$/i.test(payload.category)
     ? payload.category
     : "general";
+  const sensitivity = payload.sensitivity === undefined ? "internal" : payload.sensitivity;
+  if (!isMemorySensitivity(sensitivity)) return NextResponse.json({ error: "Choose routine, internal or restricted sensitivity." }, { status: 400 });
+  const expiresAt = getMemoryExpiry(payload.expiresInDays);
+  if (expiresAt === undefined) return NextResponse.json({ error: "Expiry must be between 1 and 3,650 days." }, { status: 400 });
+  if (payload.sourceReference !== undefined && (typeof payload.sourceReference !== "string" || payload.sourceReference.length > 500)) {
+    return NextResponse.json({ error: "Source reference must be 500 characters or fewer." }, { status: 400 });
+  }
 
   let encryptedContent: string;
   try {
@@ -107,8 +115,8 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from("memories")
-    .insert({ user_id: auth.user.id, category, content: encryptedContent, source: "owner" })
-    .select("id, category, created_at")
+    .insert({ user_id: auth.user.id, category, content: encryptedContent, source: "owner", sensitivity, expires_at: expiresAt, source_reference: typeof payload.sourceReference === "string" ? payload.sourceReference.trim() || null : null })
+    .select("id, category, sensitivity, expires_at, created_at")
     .single();
 
   if (error || !data) return NextResponse.json({ error: "Could not save memory. Check database setup." }, { status: 503 });
