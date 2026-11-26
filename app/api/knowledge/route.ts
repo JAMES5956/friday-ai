@@ -25,8 +25,10 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const type = url.searchParams.get("type");
   const status = url.searchParams.get("status") ?? "active";
+  const search = (url.searchParams.get("q") ?? "").trim().toLocaleLowerCase();
   if (type && !isRecordType(type)) return fail("Invalid archive record type.", 400);
   if (!isRecordStatus(status)) return fail("Invalid archive status.", 400);
+  if (search.length > 120) return fail("Search query is too long.", 400);
 
   let query = context.supabase.from("knowledge_records")
     .select("id, record_type, status, sensitivity, expires_at, created_at, updated_at, payload_ciphertext")
@@ -43,7 +45,14 @@ export async function GET(request: Request) {
       expired: Boolean(row.expires_at && new Date(row.expires_at).getTime() <= now),
       payload: JSON.parse(decryptPrivateData(row.payload_ciphertext))
     }));
-    return NextResponse.json({ records }, { headers: { "Cache-Control": "no-store" } });
+    const filtered = search ? records.filter(record => {
+      const payloadText = [record.payload.title, record.payload.body, record.payload.rationale, record.payload.project,
+        ...(Array.isArray(record.payload.tags) ? record.payload.tags : []),
+        ...(Array.isArray(record.payload.sources) ? record.payload.sources.map((source: { label?: string }) => source?.label ?? "") : [])]
+        .filter(value => typeof value === "string").join(" ").toLocaleLowerCase();
+      return payloadText.includes(search);
+    }) : records;
+    return NextResponse.json({ records: filtered, total: filtered.length }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return fail("Archive data could not be decrypted. Check the FRIDAY encryption key.", 503);
   }
