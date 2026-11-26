@@ -20,6 +20,7 @@ export default function ProjectsPanel() {
   const [milestoneLines, setMilestoneLines] = useState("");
   const [taskLines, setTaskLines] = useState("");
   const [progressDraft, setProgressDraft] = useState<Record<string, string>>({});
+  const [selectedForContext, setSelectedForContext] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
@@ -37,6 +38,16 @@ export default function ProjectsPanel() {
   useEffect(() => { void loadProjects(); }, [loadProjects]);
 
   const activeProjects = useMemo(() => projects.filter(project => project.payload.status !== "archived"), [projects]);
+  useEffect(() => {
+    const clear = () => setSelectedForContext([]);
+    window.addEventListener("friday:project-context-cleared", clear);
+    return () => window.removeEventListener("friday:project-context-cleared", clear);
+  }, []);
+  function toggleProjectContext(id: string, checked: boolean) {
+    const next = checked ? (selectedForContext.includes(id) || selectedForContext.length >= 3 ? selectedForContext : [...selectedForContext, id]) : selectedForContext.filter(item => item !== id);
+    setSelectedForContext(next);
+    window.dispatchEvent(new CustomEvent("friday:project-context", { detail: next }));
+  }
 
   function parseMilestones(value: string): ProjectPayload["milestones"] {
     return value.split("\n").map(line => line.trim()).filter(Boolean).map(line => {
@@ -129,6 +140,7 @@ export default function ProjectsPanel() {
         return <article className={styles.card} key={project.id}>
           <div className={styles.cardTop}><div><span className={styles.priority}>{project.payload.priority} priority</span><h3>{project.payload.title}</h3></div><select aria-label={"Status for " + project.payload.title} value={project.payload.status} disabled={busy} onChange={event => void updateProject(project, { ...project.payload, status: event.target.value as ProjectStatus })}><option value="planning">Planning</option><option value="active">Active</option><option value="on_hold">On hold</option><option value="completed">Completed</option><option value="archived">Archived</option></select></div>
           <p className={styles.purpose}>{project.payload.purpose}</p>
+          <label className={styles.contextChoice}><input type="checkbox" checked={selectedForContext.includes(project.id)} disabled={!selectedForContext.includes(project.id) && selectedForContext.length >= 3} onChange={event => toggleProjectContext(project.id, event.target.checked)} /> Include in next FRIDAY message</label>
           <div className={styles.meta}><span>Owner: {project.payload.ownerAgentId.toUpperCase()}</span><span>{project.payload.targetDate ? "Target: " + project.payload.targetDate : "No target date"}</span><span>Updated {new Date(project.updatedAt).toLocaleDateString()}</span></div>
           <div className={styles.progressLabel}><strong>{progress}% complete</strong><span>{project.payload.milestones.filter(item => item.status === "completed").length} / {project.payload.milestones.length} milestones · {project.payload.tasks.filter(item => item.status === "completed").length} / {project.payload.tasks.length} tasks</span></div>
           <div className={styles.progressTrack}><span style={{ width: progress + "%" }} /></div>

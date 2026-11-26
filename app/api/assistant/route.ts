@@ -126,7 +126,7 @@ export async function POST(request: Request) {
     return fail("REQUEST_TOO_LARGE", "Request is too large.", 413);
   }
 
-  let payload: { message?: unknown; conversationId?: unknown; includeMemory?: unknown; knowledgeRecordIds?: unknown };
+  let payload: { message?: unknown; conversationId?: unknown; includeMemory?: unknown; knowledgeRecordIds?: unknown; projectRecordIds?: unknown };
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -152,6 +152,10 @@ export async function POST(request: Request) {
   }
   if (payload.knowledgeRecordIds !== undefined && (!Array.isArray(payload.knowledgeRecordIds) || payload.knowledgeRecordIds.length > 5 || payload.knowledgeRecordIds.some(id => typeof id !== "string" || !UUID_PATTERN.test(id)) || new Set(payload.knowledgeRecordIds).size !== payload.knowledgeRecordIds.length)) {
     return fail("INVALID_KNOWLEDGE_SELECTION", "Select up to five valid, unique archive records.", 400);
+  }
+
+  if (payload.projectRecordIds !== undefined && (!Array.isArray(payload.projectRecordIds) || payload.projectRecordIds.length > 3 || payload.projectRecordIds.some(id => typeof id !== "string" || !UUID_PATTERN.test(id)) || new Set(payload.projectRecordIds).size !== payload.projectRecordIds.length)) {
+    return fail("INVALID_PROJECT_SELECTION", "Select up to three valid, unique projects.", 400);
   }
 
   let owner;
@@ -302,6 +306,23 @@ export async function POST(request: Request) {
     }
   }
 
+  let selectedProjects: string[] = [];
+  const selectedProjectIds = (payload.projectRecordIds ?? []) as string[];
+  if (selectedProjectIds.length) {
+    const { data: projectRows, error: projectError } = await supabase.from("project_records")
+      .select("id, payload_ciphertext").eq("owner_id", owner.user.id).in("id", selectedProjectIds);
+    if (projectError) return fail("PROJECT_STORE_UNAVAILABLE", "Could not load selected project context. Apply migration 0008 if it is pending.", 503);
+    if ((projectRows ?? []).length !== selectedProjectIds.length) return fail("PROJECT_SELECTION_UNAVAILABLE", "One or more selected projects are unavailable.", 400);
+    try {
+      selectedProjects = (projectRows ?? []).map(row => {
+        const project = JSON.parse(decryptPrivateData(row.payload_ciphertext));
+        if (!project || typeof project.title !== "string" || typeof project.purpose !== "string" || project.status === "archived") throw new Error("Unavailable project");
+        return JSON.stringify({ title: project.title, purpose: project.purpose, status: project.status, priority: project.priority, milestones: project.milestones, tasks: project.tasks, progressUpdates: Array.isArray(project.progressUpdates) ? project.progressUpdates.slice(0, 5) : [], blockers: project.blockers });
+      });
+      if (selectedProjects.join("").length > 10_000) return fail("PROJECT_CONTEXT_TOO_LARGE", "Selected project context is too large. Choose fewer or shorter projects.", 413);
+    } catch { return fail("PRIVATE_DATA_UNREADABLE", "Selected project records could not be decrypted or validated.", 503); }
+  }
+
   let providerMessages;
   try {
     providerMessages = buildConversation([
@@ -310,7 +331,7 @@ export async function POST(request: Request) {
         content: decryptPrivateData(item.content)
       })),
       userMessage
-    ], savedMemories, selectedKnowledge);
+    ], savedMemories, selectedKnowledge, selectedProjects);
   } catch {
     return fail("PRIVATE_DATA_UNREADABLE", "Conversation history could not be decrypted. Check the encryption key.", 503);
   }

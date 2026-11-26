@@ -33,6 +33,7 @@ export default function WorkspaceClient() {
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [includeMemory, setIncludeMemory] = useState(false);
   const [knowledgeRecordIds, setKnowledgeRecordIds] = useState<string[]>([]);
+  const [projectRecordIds, setProjectRecordIds] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState("");
   const [memories, setMemories] = useState<MemoryItem[]>([]);
@@ -249,6 +250,14 @@ export default function WorkspaceClient() {
     return () => window.removeEventListener("friday:knowledge-context", receiveKnowledgeSelection);
   }, []);
   useEffect(() => {
+    const receiveProjectSelection = (event: Event) => {
+      const ids = (event as CustomEvent<string[]>).detail;
+      if (Array.isArray(ids) && ids.length <= 3 && ids.every(id => typeof id === "string")) setProjectRecordIds(ids);
+    };
+    window.addEventListener("friday:project-context", receiveProjectSelection);
+    return () => window.removeEventListener("friday:project-context", receiveProjectSelection);
+  }, []);
+  useEffect(() => {
     const refreshConversations = () => { void loadConversations(); };
     window.addEventListener("friday:conversation-refresh", refreshConversations);
     return () => window.removeEventListener("friday:conversation-refresh", refreshConversations);
@@ -266,7 +275,7 @@ export default function WorkspaceClient() {
       const response = await fetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: content, conversationId, includeMemory, knowledgeRecordIds })
+        body: JSON.stringify({ message: content, conversationId, includeMemory, knowledgeRecordIds, projectRecordIds })
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -274,7 +283,9 @@ export default function WorkspaceClient() {
         return;
       }
       setKnowledgeRecordIds([]);
+      setProjectRecordIds([]);
       window.dispatchEvent(new Event("friday:knowledge-context-cleared"));
+      window.dispatchEvent(new Event("friday:project-context-cleared"));
       setConversationId(payload.conversationId);
       setModelTier(payload.modelTier);
       setSpecialistRecommendation(payload.specialistRecommendation ?? null);
