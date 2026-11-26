@@ -2,6 +2,45 @@ import type { SpecialistAgentId } from "./registry";
 
 type AgentModelConfig = { baseUrl: string; apiKey: string; model: string };
 type AgentRuntimeEnv = Record<string, string | undefined>;
+type AgentProviderResponse = { choices?: Array<{ message?: { content?: string | null } }> };
+
+const MAX_AGENT_RESPONSE_BYTES = 1_048_576;
+
+async function readBoundedJson(response: Response): Promise<AgentProviderResponse | null> {
+  const declaredLength = Number(response.headers.get("content-length") ?? 0);
+  if (declaredLength > MAX_AGENT_RESPONSE_BYTES || !response.body) return null;
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_AGENT_RESPONSE_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return parsed as AgentProviderResponse;
+  } catch {
+    return null;
+  }
+}
 
 export function resolveAgentModelConfig(agentId: SpecialistAgentId, env: AgentRuntimeEnv = process.env): AgentModelConfig | null {
   const baseUrl = env.AI_BASE_URL?.trim();
@@ -44,9 +83,10 @@ export async function executeAgentTask(
     });
   } catch { return { ok: false, code: "AGENT_PROVIDER_UNREACHABLE" }; }
   if (!response.ok) return { ok: false, code: "AGENT_PROVIDER_ERROR" };
-  let payload: { choices?: Array<{ message?: { content?: string | null } }> };
-  try { payload = await response.json() as typeof payload; }
+  let payload: AgentProviderResponse | null;
+  try { payload = await readBoundedJson(response); }
   catch { return { ok: false, code: "AGENT_PROVIDER_INVALID_RESPONSE" }; }
+  if (!payload) return { ok: false, code: "AGENT_PROVIDER_INVALID_RESPONSE" };
   const content = payload.choices?.[0]?.message?.content;
   if (typeof content !== "string" || !content.trim()) return { ok: false, code: "AGENT_PROVIDER_EMPTY_RESPONSE" };
   return { ok: true, content: content.trim() };
