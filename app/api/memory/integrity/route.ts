@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnerSession } from "@/lib/auth/owner";
+import { recordNexusIntegritySummary } from "@/lib/security/audit";
 import {
   createMemoryIntegrityDigest,
   decryptPrivateData,
@@ -116,6 +117,7 @@ export async function GET() {
       tampered: records.filter(item => item.status === "tampered").length,
       unreadable: records.filter(item => item.status === "unreadable").length
     };
+    await recordNexusIntegritySummary(context.supabase, context.owner.id, counts);
     return NextResponse.json({ report: { scanned: records.length, counts, records } }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return fail("NEXUS memory integrity is not configured.", 503);
