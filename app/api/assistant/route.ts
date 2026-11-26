@@ -72,7 +72,7 @@ export async function GET(request: Request) {
     });
     return NextResponse.json({ conversation, messages }, { headers: { "Cache-Control": "no-store" } });
   } catch {
-    return fail("PRIVATE_DATA_UNREADABLE", "Conversation history could not be decrypted. Check the encryption key.", 503);
+    return fail("PRIVATE_DATA_UNREADABLE", "Conversation history could not be verified or decrypted. Older unsigned messages must be reviewed before this conversation can continue.", 503);
   }
 }
 
