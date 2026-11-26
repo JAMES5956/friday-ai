@@ -7,12 +7,12 @@ type MemoryIntegrityRecord = {
   id: string;
   category: string;
   updatedAt: string;
-  status: "verified" | "legacy_unsealed" | "tampered" | "unreadable";
+  status: "verified" | "authenticated" | "legacy_unsealed" | "tampered" | "unreadable";
   sealable: boolean;
 };
 type IntegrityReport = {
   scanned: number;
-  counts: { verified: number; legacy_unsealed: number; tampered: number; unreadable: number };
+  counts: { verified: number; authenticated: number; legacy_unsealed: number; tampered: number; unreadable: number };
   records: MemoryIntegrityRecord[];
 };
 
@@ -69,21 +69,22 @@ export default function MemoryIntegrityPanel() {
     {!report && !status ? <p className="nexus-integrity-note">Preparing the first integrity scan…</p> : null}
     {counts ? <>
       <div className="nexus-integrity-stats">
-        <div className="nexus-integrity-stat"><strong>{counts.verified}</strong><span>Verified</span></div>
+        <div className="nexus-integrity-stat"><strong>{counts.verified}</strong><span>Signed</span></div>
+        <div className="nexus-integrity-stat"><strong>{counts.authenticated}</strong><span>Encrypted</span></div>
         <div className="nexus-integrity-stat"><strong>{counts.legacy_unsealed}</strong><span>Legacy review</span></div>
         <div className="nexus-integrity-stat"><strong>{counts.tampered}</strong><span>Tampered</span></div>
         <div className="nexus-integrity-stat"><strong>{counts.unreadable}</strong><span>Unreadable</span></div>
       </div>
-      <p className="nexus-integrity-note">Scanned {report.scanned} records across personal memories, specialist memories, the knowledge archive and projects (up to 100 per store). Legacy records are not yet signed. NEXUS never overwrites a tampered or unreadable record.</p>
+      <p className="nexus-integrity-note">Scanned {report.scanned} records across seven stores (up to 100 rows per store). Signed records have an owner-bound integrity digest; conversation and task ciphertext is checked using authenticated decryption. Legacy records are not yet signed. NEXUS never overwrites a tampered or unreadable record.</p>
       <div className="nexus-integrity-list">
         {report.records.map(record => <div className="nexus-integrity-row" key={record.id}>
           <label>
-            {record.sealable ? <input type="checkbox" checked={selected.includes(record.id)} onChange={event => toggle(record.id, event.target.checked)} disabled={busy || (!selected.includes(record.id) && selected.length >= 25)} /> : <span aria-hidden="true">{record.status === "verified" ? <ShieldCheck size={15} /> : <ShieldAlert size={15} />}</span>}
+            {record.sealable ? <input type="checkbox" checked={selected.includes(record.id)} onChange={event => toggle(record.id, event.target.checked)} disabled={busy || (!selected.includes(record.id) && selected.length >= 25)} /> : <span aria-hidden="true">{(record.status === "verified" || record.status === "authenticated") ? <ShieldCheck size={15} /> : <ShieldAlert size={15} />}</span>}
             <span>{record.category}<small>Updated {new Date(record.updatedAt).toLocaleDateString()}</small></span>
           </label>
-          <span className={"nexus-integrity-status " + record.status}>{record.status.replace("_", " ")}</span>
+          <span className={"nexus-integrity-status " + record.status}>{record.status === "authenticated" ? "authenticated ciphertext" : record.status.replace("_", " ")}</span>
         </div>)}
-        {report.records.length === 0 ? <p className="nexus-integrity-note">No retained personal memories were found.</p> : null}
+        {report.records.length === 0 ? <p className="nexus-integrity-note">No protected records were found in the scanned stores.</p> : null}
       </div>
       <div className="nexus-integrity-actions">
         <button type="button" disabled={busy || selected.length === 0} onClick={() => void sealReviewed()}>Seal {selected.length} reviewed legacy memories</button>
@@ -91,6 +92,6 @@ export default function MemoryIntegrityPanel() {
       </div>
     </> : null}
     {status ? <p className="nexus-integrity-note" role="status">{status}</p> : null}
-    <p className="nexus-integrity-note">Legacy specialist, archive and project records are reported for review but are not bulk-sealed here. Only explicitly selected personal memories can be sealed through this panel. Conversation history and task-event payloads are not yet covered.</p>
+    <p className="nexus-integrity-note">Legacy specialist, archive and project records are reported for review but are not bulk-sealed here. Only explicitly selected personal memories can be sealed through this panel. Conversation history, specialist tasks and task-event payloads are checked for authenticated encryption. They are not yet protected by separate owner-and-record-bound integrity signatures.</p>
   </section>;
 }
