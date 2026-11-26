@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnerSession } from "@/lib/auth/owner";
 import { generateAssistantReply } from "@/lib/ai/provider";
 import { buildConversation } from "@/lib/ai/orchestrator";
 import { evaluateRequestForApproval } from "@/lib/security/nexus";
-import { decryptPrivateData, encryptPrivateData, verifyMemoryIntegrityDigest } from "@/lib/security/encryption";
+import { createMemoryIntegrityDigest, decryptPrivateData, encryptPrivateData, verifyMemoryIntegrityDigest } from "@/lib/security/encryption";
 import { recommendSpecialist } from "@/lib/agents/router";
 import { isMemoryAvailableToModel } from "@/lib/memory/policy";
 import { validateProjectPayload } from "@/lib/projects/policy";
@@ -55,7 +56,7 @@ export async function GET(request: Request) {
   if (conversationError || !conversation) return fail("CONVERSATION_NOT_FOUND", "Conversation was not found.", 404);
 
   const { data: rows, error } = await supabase.from("messages")
-    .select("role, content, created_at")
+    .select("id, role, content, integrity_digest, integrity_version, created_at")
     .eq("conversation_id", requestedId)
     .eq("user_id", owner.user.id)
     .in("role", ["user", "assistant"])
@@ -64,11 +65,11 @@ export async function GET(request: Request) {
   if (error) return fail("MEMORY_STORE_UNAVAILABLE", "Could not load conversation history.", 503);
 
   try {
-    const messages = (rows ?? []).slice().reverse().map(row => ({
-      role: row.role as "user" | "assistant",
-      content: decryptPrivateData(row.content),
-      createdAt: row.created_at
-    }));
+    const messages = (rows ?? []).slice().reverse().map(row => {
+      if (row.integrity_digest !== null && (row.integrity_version !== 1 ||
+          !verifyMemoryIntegrityDigest(owner.user!.id, row.id, row.content, row.integrity_digest, "message"))) throw new Error("Message integrity mismatch");
+      return { role: row.role as "user" | "assistant", content: decryptPrivateData(row.content), createdAt: row.created_at };
+    });
     return NextResponse.json({ conversation, messages }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return fail("PRIVATE_DATA_UNREADABLE", "Conversation history could not be decrypted. Check the encryption key.", 503);
@@ -254,7 +255,7 @@ export async function POST(request: Request) {
 
   const { data: history, error: historyError } = await supabase
     .from("messages")
-    .select("role, content")
+    .select("id, role, content, integrity_digest, integrity_version")
     .eq("conversation_id", conversationId)
     .eq("user_id", owner.user.id)
     .order("created_at", { ascending: false })
@@ -347,7 +348,11 @@ export async function POST(request: Request) {
     providerMessages = buildConversation([
       ...(history ?? []).slice().reverse().map(item => ({
         role: item.role as "user" | "assistant",
-        content: decryptPrivateData(item.content)
+        content: (() => {
+          if (item.integrity_digest !== null && (item.integrity_version !== 1 ||
+              !verifyMemoryIntegrityDigest(owner.user!.id, item.id, item.content, item.integrity_digest, "message"))) throw new Error("Message integrity mismatch");
+          return decryptPrivateData(item.content);
+        })()
       })),
       userMessage
     ], savedMemories, selectedKnowledge, selectedProjects);
@@ -363,19 +368,19 @@ export async function POST(request: Request) {
       : "The AI provider could not complete the request.", status);
   }
 
+  const userMessageId = randomUUID();
+  const userCiphertext = encryptPrivateData(userMessage.content);
   const { error: saveUserError } = await supabase.from("messages").insert({
-    conversation_id: conversationId,
-    user_id: owner.user.id,
-    role: "user",
-    content: encryptPrivateData(userMessage.content)
+    id: userMessageId, conversation_id: conversationId, user_id: owner.user.id, role: "user",
+    content: userCiphertext, integrity_digest: createMemoryIntegrityDigest(owner.user.id, userMessageId, userCiphertext, "message"), integrity_version: 1
   });
   if (saveUserError) return fail("MEMORY_STORE_UNAVAILABLE", "Could not save your message.", 503);
 
+  const assistantMessageId = randomUUID();
+  const assistantCiphertext = encryptPrivateData(generated.content);
   const { error: saveAssistantError } = await supabase.from("messages").insert({
-    conversation_id: conversationId,
-    user_id: owner.user.id,
-    role: "assistant",
-    content: encryptPrivateData(generated.content)
+    id: assistantMessageId, conversation_id: conversationId, user_id: owner.user.id, role: "assistant",
+    content: assistantCiphertext, integrity_digest: createMemoryIntegrityDigest(owner.user.id, assistantMessageId, assistantCiphertext, "message"), integrity_version: 1
   });
   if (saveAssistantError) return fail("MEMORY_STORE_UNAVAILABLE", "The reply was generated but could not be saved.", 503);
 
