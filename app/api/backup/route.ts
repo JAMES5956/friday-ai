@@ -9,6 +9,30 @@ const TABLES = BACKUP_TABLES;
 const MAX_ROWS_PER_TABLE = 5000;
 const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
 
+async function readLimitedBody(request: Request, maxBytes: number) {
+  const reader = request.body?.getReader();
+  if (!reader) return "";
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new RangeError("BACKUP_BODY_TOO_LARGE");
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+}
+
 function fail(message: string, status: number) {
   return NextResponse.json({ error: message }, { status, headers: { "Cache-Control": "no-store" } });
 }
@@ -102,8 +126,13 @@ export async function POST(request: Request) {
     if (!(request.headers.get("content-type") ?? "").toLowerCase().includes("application/json")) return fail("Send an application/json backup file.", 415);
     const declaredLength = Number(request.headers.get("content-length") ?? 0);
     if (declaredLength > MAX_BACKUP_BYTES) return fail("Backup file exceeds the 20 MB verification limit.", 413);
-    const raw = await request.text();
-    if (new TextEncoder().encode(raw).byteLength > MAX_BACKUP_BYTES) return fail("Backup file exceeds the 20 MB verification limit.", 413);
+    let raw: string;
+    try {
+      raw = await readLimitedBody(request, MAX_BACKUP_BYTES);
+    } catch (error) {
+      if (error instanceof RangeError) return fail("Backup file exceeds the 20 MB verification limit.", 413);
+      return fail("Backup file must contain valid UTF-8 JSON.", 400);
+    }
 
     let input: Record<string, unknown>;
     try {
