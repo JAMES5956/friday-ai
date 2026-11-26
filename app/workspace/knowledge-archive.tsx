@@ -132,6 +132,7 @@ export default function KnowledgeArchive() {
       });
       const payload = await response.json();
       if (!response.ok) { setNotice(payload.error ?? "Could not update this record."); return; }
+      setSelectedForContext(current => current.filter(item => item !== id));
       await loadRecords();
     } catch {
       setNotice("Could not reach the private archive.");
