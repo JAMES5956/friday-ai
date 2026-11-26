@@ -28,7 +28,7 @@ const ROUTES: Array<{
   },
   {
     agentId: "atlas", name: "ATLAS", role: "strategy and operations",
-    terms: ["strategy", "strategic plan", "business plan", "roadmap", "business model", "growth plan", "decision framework", "long term plan", "prioritise", "prioritize", "operations plan", "project milestones"]
+    terms: ["strategy", "strategic plan", "strategic roadmap", "business plan", "roadmap", "business model", "growth plan", "decision framework", "long term plan", "long term strategic", "prioritise", "prioritize", "operations plan", "project milestones"]
   },
   {
     agentId: "vantage", name: "VANTAGE", role: "finance and business",
@@ -44,7 +44,7 @@ const ROUTES: Array<{
   },
   {
     agentId: "scout", name: "SCOUT", role: "opportunities and discovery",
-    terms: ["scholarship", "job opportunity", "career opportunity", "grant", "funding opportunity", "internship", "vacancy", "tender", "competition", "partnership opportunity"]
+    terms: ["scholarship", "scholarships", "scholarship opportunities", "job opportunity", "career opportunity", "grant", "grants", "funding opportunity", "internship", "vacancy", "tender", "competition", "partnership opportunity"]
   }
 ];
 
