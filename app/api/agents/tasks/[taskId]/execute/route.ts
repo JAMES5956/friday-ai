@@ -145,7 +145,7 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
       details_integrity_version: 1
     });
     if (completeAuditError) {
-      await supabase.from("agent_tasks").update({ status: "failed", result_ciphertext: null }).eq("id", taskId).eq("owner_id", owner.user.id);
+      await supabase.from("agent_tasks").update({ status: "failed", result_ciphertext: null, result_integrity_digest: null, result_integrity_version: null }).eq("id", taskId).eq("owner_id", owner.user.id);
       claimedByThisRequest = false;
       return fail("TASK_AUDIT_FAILED", "The result was withheld because its completion event could not be recorded.", 503);
     }
@@ -170,7 +170,7 @@ Result summary: ${result.content.slice(0, 6000)}`);
     if (claimedByThisRequest && recoveryClient && recoveryOwnerId) {
       try {
         const { data: recovered } = await recoveryClient.from("agent_tasks")
-          .update({ status: "failed", result_ciphertext: null })
+          .update({ status: "failed", result_ciphertext: null, result_integrity_digest: null, result_integrity_version: null })
           .eq("id", taskId).eq("owner_id", recoveryOwnerId).eq("status", "in_progress")
           .select("id").maybeSingle();
         if (recovered) {
