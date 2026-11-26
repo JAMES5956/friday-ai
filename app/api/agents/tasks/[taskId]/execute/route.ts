@@ -16,6 +16,7 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
   const { taskId } = await context.params;
   let recoveryOwnerId: string | null = null;
   let recoveryClient: Awaited<ReturnType<typeof createClient>> | null = null;
+  let claimedByThisRequest = false;
   if (!UUID.test(taskId)) return fail("INVALID_TASK", "Task identifier is invalid.", 400);
   try {
     const owner = await getOwnerSession();
@@ -78,6 +79,7 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
       .select("id").maybeSingle();
     if (claimError) return fail("TASK_CLAIM_FAILED", "Could not safely claim this task for execution.", 503);
     if (!claimed) return fail("TASK_ALREADY_RUNNING", "Another request has already claimed this task.", 409);
+    claimedByThisRequest = true;
 
     const { error: startAuditError } = await supabase.from("agent_task_events").insert({
       owner_id: owner.user.id, task_id: taskId, actor_agent_id: "friday", event_type: "task_started",
@@ -85,12 +87,14 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
     });
     if (startAuditError) {
       await supabase.from("agent_tasks").update({ status: "queued" }).eq("id", taskId).eq("owner_id", owner.user.id).eq("status", "in_progress");
+      claimedByThisRequest = false;
       return fail("TASK_AUDIT_FAILED", "Task execution was stopped because its start event could not be recorded.", 503);
     }
 
     const result = await executeAgentTask(agent, taskDescription, memories);
     if (!result.ok) {
       await supabase.from("agent_tasks").update({ status: "failed" }).eq("id", taskId).eq("owner_id", owner.user.id).eq("status", "in_progress");
+      claimedByThisRequest = false;
       await supabase.from("agent_task_events").insert({
         owner_id: owner.user.id, task_id: taskId, actor_agent_id: agent.id, event_type: "task_execution_failed",
         details_ciphertext: encryptPrivateData(JSON.stringify({ code: result.code }))
@@ -103,6 +107,7 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
     }).eq("id", taskId).eq("owner_id", owner.user.id).eq("status", "in_progress");
     if (completeError) {
       await supabase.from("agent_tasks").update({ status: "failed", result_ciphertext: null }).eq("id", taskId).eq("owner_id", owner.user.id).eq("status", "in_progress");
+      claimedByThisRequest = false;
       return fail("TASK_RESULT_SAVE_FAILED", "The specialist replied, but its result could not be saved.", 503);
     }
 
@@ -112,6 +117,7 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
     });
     if (completeAuditError) {
       await supabase.from("agent_tasks").update({ status: "failed", result_ciphertext: null }).eq("id", taskId).eq("owner_id", owner.user.id);
+      claimedByThisRequest = false;
       return fail("TASK_AUDIT_FAILED", "The result was withheld because its completion event could not be recorded.", 503);
     }
 
@@ -129,7 +135,7 @@ Result summary: ${result.content.slice(0, 6000)}`),
   } catch {
     // If an unexpected exception occurs after the task was claimed, do not leave it
     // permanently marked in_progress. Only recover a task still owned by this request.
-    if (recoveryClient && recoveryOwnerId) {
+    if (claimedByThisRequest && recoveryClient && recoveryOwnerId) {
       try {
         const { data: recovered } = await recoveryClient.from("agent_tasks")
           .update({ status: "failed", result_ciphertext: null })

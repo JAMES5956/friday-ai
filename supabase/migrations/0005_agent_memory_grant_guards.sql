@@ -29,5 +29,21 @@ create trigger enforce_agent_memory_grant_before_write
   before insert or update of owner_id,memory_id,from_agent_id,to_agent_id,expires_at
   on public.agent_memory_grants for each row execute function public.enforce_agent_memory_grant();
 revoke all on function public.enforce_agent_memory_grant() from public;
+-- Retain the strongest existing active grant if historical duplicates exist.
+-- Prefer the grant with the latest expiry, then the most recently approved.
+with ranked_active_grants as (
+  select id,
+         row_number() over (
+           partition by owner_id, memory_id, to_agent_id
+           order by expires_at desc nulls last, approved_at desc, id
+         ) as duplicate_rank
+  from public.agent_memory_grants
+  where revoked_at is null
+)
+update public.agent_memory_grants g
+set revoked_at = now()
+from ranked_active_grants r
+where g.id = r.id and r.duplicate_rank > 1;
+
 create unique index if not exists agent_memory_grants_one_active_pair
   on public.agent_memory_grants(owner_id,memory_id,to_agent_id) where revoked_at is null;
