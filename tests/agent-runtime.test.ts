@@ -21,7 +21,7 @@ describe("specialist role instructions", () => {
     const sage = specialistAgents.find(agent => agent.id === "sage");
     expect(sage).toBeDefined();
     const prompt = buildAgentSystemPrompt(sage!);
-    expect(prompt).toContain("Education, learning and mathematics");
+    expect(prompt).toContain("education, learning and mathematics");
     expect(prompt).toContain("Mathematics and advanced calculations");
     expect(prompt).toContain("Does not submit work");
   });
