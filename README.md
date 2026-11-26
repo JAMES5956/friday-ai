@@ -16,6 +16,7 @@ The repository now contains:
 - Central specialist recommendation and explicit owner-controlled task handoff.
 - Owner-triggered specialist execution through dedicated per-agent model configuration, encrypted task results, task-event auditing and isolated private working memory.
 - Owner-controlled specialist memory management, expiring cross-agent sharing grants, revocation, and restricted-memory exclusion.
+- Owner memory sensitivity labels, optional retention expiry, provenance references and strict exclusion of restricted or expired memories from model context.
 - FRIDAY can review completed specialist outputs, challenge assumptions and save its synthesis into the owner conversation history.
 - Automated lint, TypeScript and production-build checks.
 
