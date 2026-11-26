@@ -23,4 +23,21 @@ describe("NEXUS backup signatures", () => {
     expect(verifyBackupSignature("owner-b", payload, signature)).toBe(false);
     expect(verifyBackupSignature("owner-a", payload, "invalid")).toBe(false);
   });
+
+  it("requires valid record-bound signatures for every encrypted work store before backup recovery", async () => {
+    process.env.FRIDAY_DATA_ENCRYPTION_KEY = Buffer.alloc(32, 21).toString("base64");
+    const { createMemoryIntegrityDigest, verifyMemoryIntegrityDigest } = await import("../lib/security/encryption");
+    const records = [
+      { id: "message-1", domain: "message" },
+      { id: "task-1", domain: "agent_task" },
+      { id: "task-1", domain: "agent_task_result" },
+      { id: "event-1", domain: "agent_task_event" }
+    ];
+    for (const record of records) {
+      const digest = createMemoryIntegrityDigest("owner-a", record.id, "friday:v1:payload", record.domain);
+      expect(verifyMemoryIntegrityDigest("owner-a", record.id, "friday:v1:payload", digest, record.domain)).toBe(true);
+      expect(verifyMemoryIntegrityDigest("owner-a", record.id, "friday:v1:altered", digest, record.domain)).toBe(false);
+      expect(verifyMemoryIntegrityDigest("owner-b", record.id, "friday:v1:payload", digest, record.domain)).toBe(false);
+    }
+  });
 });
