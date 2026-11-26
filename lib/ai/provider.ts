@@ -135,7 +135,12 @@ export async function generateAssistantReply(messages: ChatMessage[], timeoutMs 
 
   if (!response.ok) return { ok: false as const, code: "AI_PROVIDER_ERROR" };
 
-  const payload = await readBoundedJson(response);
+  let payload: ProviderResponse | null;
+  try {
+    payload = await readBoundedJson(response);
+  } catch {
+    return { ok: false as const, code: "AI_PROVIDER_INVALID_RESPONSE" };
+  }
   if (!payload) return { ok: false as const, code: "AI_PROVIDER_INVALID_RESPONSE" };
 
   const content = payload.choices?.[0]?.message?.content;
