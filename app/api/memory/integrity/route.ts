@@ -42,18 +42,18 @@ export async function GET() {
         .eq("owner_id", context.owner.id).order("updated_at", { ascending: false }).limit(MAX_SCAN),
       context.supabase.from("project_records").select("id, payload_ciphertext, integrity_digest, integrity_version, updated_at")
         .eq("owner_id", context.owner.id).order("updated_at", { ascending: false }).limit(MAX_SCAN),
-      context.supabase.from("messages").select("id, role, content, created_at").eq("user_id", context.owner.id)
+      context.supabase.from("messages").select("id, role, content, integrity_digest, integrity_version, created_at").eq("user_id", context.owner.id)
         .in("role", ["user", "assistant"]).order("created_at", { ascending: false }).limit(MAX_SCAN),
-      context.supabase.from("agent_tasks").select("id, title, task_ciphertext, result_ciphertext, created_at").eq("owner_id", context.owner.id)
+      context.supabase.from("agent_tasks").select("id, title, task_ciphertext, result_ciphertext, task_integrity_digest, task_integrity_version, result_integrity_digest, result_integrity_version, created_at").eq("owner_id", context.owner.id)
         .order("created_at", { ascending: false }).limit(MAX_SCAN),
-      context.supabase.from("agent_task_events").select("id, event_type, details_ciphertext, created_at").eq("owner_id", context.owner.id)
+      context.supabase.from("agent_task_events").select("id, event_type, details_ciphertext, details_integrity_digest, details_integrity_version, created_at").eq("owner_id", context.owner.id)
         .order("created_at", { ascending: false }).limit(MAX_SCAN)
     ]);
     if (personalResult.error || agentResult.error || archiveResult.error || projectResult.error || messageResult.error || taskResult.error || taskEventResult.error) {
-      return fail("NEXUS could not scan every protected store. Confirm migrations 0006–0009 are applied.", 503);
+      return fail("NEXUS could not scan every protected store. Confirm migrations 0006–0010 are applied.", 503);
     }
 
-    const records: Array<{id:string;category:string;updatedAt:string;status:"verified"|"authenticated"|"legacy_unsealed"|"tampered"|"unreadable";sealable:boolean}> = [];
+    const records: Array<{id:string;category:string;updatedAt:string;status:"verified"|"legacy_unsealed"|"tampered"|"unreadable";sealable:boolean}> = [];
     const inspect = (rows: Array<Record<string, unknown>>, category: (row: Record<string, unknown>) => string,
       ciphertextField: string, domain: string, sealable = false) => {
       for (const row of rows) {
@@ -79,32 +79,39 @@ export async function GET() {
     inspect((archiveResult.data ?? []) as unknown as Array<Record<string,unknown>>, row => "Knowledge archive · " + String(row.record_type ?? "Record"), "payload_ciphertext", "knowledge");
     inspect((projectResult.data ?? []) as unknown as Array<Record<string,unknown>>, () => "Project record", "payload_ciphertext", "project");
 
-    const inspectAuthenticated = (rows: Array<Record<string, unknown>>, category: (row: Record<string, unknown>) => string,
-      fields: Array<{ name: string; optional?: boolean }>) => {
+    const inspectSigned = (rows: Array<Record<string, unknown>>, category: (row: Record<string, unknown>) => string,
+      fields: Array<{ ciphertext: string; digest: string; version: string; domain: string; optional?: boolean }>) => {
       for (const row of rows) for (const field of fields) {
-        const ciphertext = row[field.name];
+        const ciphertext = row[field.ciphertext];
         if (ciphertext == null && field.optional) continue;
-        let status: "authenticated" | "unreadable";
-        try {
-          if (typeof ciphertext !== "string") throw new Error("Missing encrypted field");
-          decryptPrivateData(ciphertext);
-          status = "authenticated";
-        } catch { status = "unreadable"; }
-        records.push({ id: String(row.id) + ":" + field.name,
-          category: category(row) + (fields.length > 1 ? " · " + (field.name === "task_ciphertext" ? "task" : "result") : ""),
-          updatedAt: String(row.created_at ?? ""), status, sealable: false });
+        const digest = row[field.digest], version = row[field.version];
+        let status: "verified" | "legacy_unsealed" | "tampered" | "unreadable";
+        if (typeof ciphertext !== "string") status = "unreadable";
+        else if (digest == null && version == null) {
+          try { decryptPrivateData(ciphertext); status = "legacy_unsealed"; } catch { status = "unreadable"; }
+        } else if (typeof digest !== "string" || version !== 1 ||
+          !verifyMemoryIntegrityDigest(context.owner.id, String(row.id), ciphertext, digest, field.domain)) status = "tampered";
+        else { try { decryptPrivateData(ciphertext); status = "verified"; } catch { status = "unreadable"; } }
+        records.push({ id: String(row.id) + ":" + field.ciphertext,
+          category: category(row) + (fields.length > 1 ? " · " + (field.ciphertext === "task_ciphertext" ? "task" : "result") : ""),
+          updatedAt: String(row.updated_at ?? row.created_at ?? ""), status, sealable: false });
       }
     };
-    inspectAuthenticated((messageResult.data ?? []) as unknown as Array<Record<string,unknown>>,
-      row => "Conversation · " + String(row.role ?? "message"), [{ name: "content" }]);
-    inspectAuthenticated((taskResult.data ?? []) as unknown as Array<Record<string,unknown>>,
-      row => "Specialist task · " + String(row.title ?? "Untitled"), [{ name: "task_ciphertext" }, { name: "result_ciphertext", optional: true }]);
-    inspectAuthenticated((taskEventResult.data ?? []) as unknown as Array<Record<string,unknown>>,
-      row => "Task event · " + String(row.event_type ?? "event"), [{ name: "details_ciphertext", optional: true }]);
+    inspectSigned((messageResult.data ?? []) as unknown as Array<Record<string,unknown>>,
+      row => "Conversation · " + String(row.role ?? "message"),
+      [{ ciphertext: "content", digest: "integrity_digest", version: "integrity_version", domain: "message" }]);
+    inspectSigned((taskResult.data ?? []) as unknown as Array<Record<string,unknown>>,
+      row => "Specialist task · " + String(row.title ?? "Untitled"),
+      [
+        { ciphertext: "task_ciphertext", digest: "task_integrity_digest", version: "task_integrity_version", domain: "agent_task" },
+        { ciphertext: "result_ciphertext", digest: "result_integrity_digest", version: "result_integrity_version", domain: "agent_task_result", optional: true }
+      ]);
+    inspectSigned((taskEventResult.data ?? []) as unknown as Array<Record<string,unknown>>,
+      row => "Task event · " + String(row.event_type ?? "event"),
+      [{ ciphertext: "details_ciphertext", digest: "details_integrity_digest", version: "details_integrity_version", domain: "agent_task_event", optional: true }]);
 
     const counts = {
       verified: records.filter(item => item.status === "verified").length,
-      authenticated: records.filter(item => item.status === "authenticated").length,
       legacy_unsealed: records.filter(item => item.status === "legacy_unsealed").length,
       tampered: records.filter(item => item.status === "tampered").length,
       unreadable: records.filter(item => item.status === "unreadable").length
