@@ -32,7 +32,7 @@ The application is not deployed. Voice is browser-based and foreground-only; tel
 
 ## Data protection
 
-1. Conversation, memory, task and result text is encrypted in the application before database writes.
+1. Conversation, memory, task, result and knowledge/decision payloads are encrypted in the application before database writes.
 2. AES-256-GCM uses a fresh 12-byte random nonce and authentication tag for each encrypted value.
 3. FRIDAY_DATA_ENCRYPTION_KEY must be a base64-encoded 32-byte key.
 4. Losing the encryption key makes encrypted content unrecoverable. Keep a secure offline backup; never commit it or store it in the database.
