@@ -6,6 +6,7 @@ import { buildConversation } from "@/lib/ai/orchestrator";
 import { evaluateRequestForApproval } from "@/lib/security/nexus";
 import { decryptPrivateData, encryptPrivateData } from "@/lib/security/encryption";
 import { recommendSpecialist } from "@/lib/agents/router";
+import { isMemoryAvailableToModel } from "@/lib/memory/policy";
 
 const MAX_BODY_BYTES = 16_384;
 const MAX_MESSAGE_LENGTH = 4_000;
@@ -257,14 +258,14 @@ export async function POST(request: Request) {
   if (payload.includeMemory === true) {
     const { data: memoryRows, error: memoryError } = await supabase
       .from("memories")
-      .select("content")
+      .select("content, sensitivity, expires_at")
       .eq("user_id", owner.user.id)
       .eq("retained", true)
       .order("updated_at", { ascending: false })
       .limit(25);
     if (memoryError) return fail("MEMORY_STORE_UNAVAILABLE", "Could not load saved memory.", 503);
     try {
-      savedMemories = (memoryRows ?? []).map(row => decryptPrivateData(row.content));
+      savedMemories = (memoryRows ?? []).filter(row => isMemoryAvailableToModel(row.sensitivity, row.expires_at)).map(row => decryptPrivateData(row.content));
     } catch {
       return fail("PRIVATE_DATA_UNREADABLE", "Saved memory could not be decrypted. Check the encryption key.", 503);
     }
