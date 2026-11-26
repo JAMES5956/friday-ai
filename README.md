@@ -84,7 +84,7 @@ GitHub Actions runs the same checks for commits to `main` and `foundation/**` br
 - Never commit real keys, passwords, tokens, private keys or recovery codes.
 - The owner email allowlist is enforced server-side; public registration is not part of the application.
 - Database tables use row-level security so authenticated users can only access rows belonging to their own auth user ID.
-- Conversation and memory content is encrypted before it is written to PostgreSQL. Keep the encryption key separate from the database and back it up securely.
+- Conversation, memory, task, result and knowledge/decision payloads are encrypted before they are written to PostgreSQL. Keep the encryption key separate from the database and back it up securely.
 - If the encryption key is missing or invalid, private storage endpoints fail closed.
 - The assistant route does not execute external actions. Sensitive or potentially irreversible delegated tasks remain blocked until the owner records approval in the task workflow.
 - A model provider must be configured before FRIDAY can generate responses.
