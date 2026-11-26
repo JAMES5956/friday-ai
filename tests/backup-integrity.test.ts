@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   createBackupSignature, createMemoryIntegrityDigest, encryptPrivateData, verifyBackupSignature
 } from "../lib/security/encryption";
-import { getBackupReadiness, inspectBackupTables, type BackupTables } from "../lib/security/backup-integrity";
+import { getBackupReadiness, inspectBackupTables, validateBackupStructure, BACKUP_TABLES, type BackupTables } from "../lib/security/backup-integrity";
 
 const originalKey = process.env.FRIDAY_DATA_ENCRYPTION_KEY;
 const TEST_KEY = Buffer.alloc(32, 11).toString("base64");
@@ -119,5 +119,47 @@ describe("NEXUS backup recovery inspection", () => {
     });
     expect(report.issues).toContainEqual({ table: "conversations", code: "duplicate_id" });
     expect(getBackupReadiness(report)).toBe("blocked");
+  });
+});
+
+describe("NEXUS backup payload shape validation", () => {
+  const emptyTables = () => Object.fromEntries(BACKUP_TABLES.map(([name]) => [name, []]));
+  const emptyCounts = () => Object.fromEntries(BACKUP_TABLES.map(([name]) => [name, 0]));
+
+  it("accepts exactly the known owner tables with matching row counts", () => {
+    const result = validateBackupStructure(emptyTables(), emptyCounts(), 5000);
+    expect(result.valid).toBe(true);
+  });
+
+  it("rejects unexpected tables instead of silently ignoring them", () => {
+    const tables = { ...emptyTables(), privileged_settings: [] };
+    const result = validateBackupStructure(tables, emptyCounts(), 5000);
+    expect(result).toMatchObject({ valid: false, reason: "unexpected_or_missing_tables" });
+  });
+
+  it("rejects missing tables and mismatched count metadata", () => {
+    const tables = emptyTables();
+    delete (tables as Record<string, unknown>).messages;
+    expect(validateBackupStructure(tables, emptyCounts(), 5000)).toMatchObject({ valid: false });
+    const counts = emptyCounts();
+    counts.messages = 1;
+    expect(validateBackupStructure(emptyTables(), counts, 5000)).toMatchObject({
+      valid: false, reason: "invalid_table_rows_or_count"
+    });
+  });
+
+  it("rejects oversized tables and non-object rows", () => {
+    const tables = emptyTables();
+    tables.conversations = [{ id: "one" }, { id: "two" }];
+    const counts = emptyCounts();
+    counts.conversations = 2;
+    expect(validateBackupStructure(tables, counts, 1)).toMatchObject({
+      valid: false, reason: "invalid_table_rows_or_count"
+    });
+    tables.conversations = [null];
+    counts.conversations = 1;
+    expect(validateBackupStructure(tables, counts, 5000)).toMatchObject({
+      valid: false, reason: "invalid_row_shape"
+    });
   });
 });
