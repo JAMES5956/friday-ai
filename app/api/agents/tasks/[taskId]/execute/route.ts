@@ -14,11 +14,15 @@ function fail(code: string, message: string, status: number) {
 
 export async function POST(_request: Request, context: { params: Promise<{ taskId: string }> }) {
   const { taskId } = await context.params;
+  let recoveryOwnerId: string | null = null;
+  let recoveryClient: Awaited<ReturnType<typeof createClient>> | null = null;
   if (!UUID.test(taskId)) return fail("INVALID_TASK", "Task identifier is invalid.", 400);
   try {
     const owner = await getOwnerSession();
     if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
     const supabase = await createClient();
+    recoveryClient = supabase;
+    recoveryOwnerId = owner.user.id;
     const { data: withinLimit, error: rateError } = await supabase.rpc("consume_rate_limit", { p_limit: 5 });
     if (rateError) return fail("SECURITY_LIMITER_UNAVAILABLE", "NEXUS request protection is unavailable.", 503);
     if (!withinLimit) return fail("RATE_LIMITED", "Too many execution attempts. Wait before trying again.", 429);
@@ -123,6 +127,27 @@ Result summary: ${result.content.slice(0, 6000)}`),
       message: memorySaveError ? "Task completed. Its result is saved, but the specialist's working memory could not be updated." : "Task completed and the specialist's private working memory was updated."
     }, { headers: { "Cache-Control": "no-store" } });
   } catch {
-    return fail("TASK_EXECUTION_UNAVAILABLE", "Specialist execution is not configured.", 503);
+    // If an unexpected exception occurs after the task was claimed, do not leave it
+    // permanently marked in_progress. Only recover a task still owned by this request.
+    if (recoveryClient && recoveryOwnerId) {
+      try {
+        const { data: recovered } = await recoveryClient.from("agent_tasks")
+          .update({ status: "failed", result_ciphertext: null })
+          .eq("id", taskId).eq("owner_id", recoveryOwnerId).eq("status", "in_progress")
+          .select("id").maybeSingle();
+        if (recovered) {
+          await recoveryClient.from("agent_task_events").insert({
+            owner_id: recoveryOwnerId,
+            task_id: taskId,
+            actor_agent_id: "friday",
+            event_type: "task_execution_interrupted",
+            details_ciphertext: null
+          });
+        }
+      } catch {
+        // Preserve the generic API failure; recovery is best-effort if the database is down.
+      }
+    }
+    return fail("TASK_EXECUTION_UNAVAILABLE", "Specialist execution failed unexpectedly. The task was marked failed when recovery was available, so you can retry it.", 503);
   }
 }
