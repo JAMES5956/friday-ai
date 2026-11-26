@@ -99,3 +99,37 @@ export function getBackupReadiness(report: IntegrityReport): "blocked" | "review
   if (report.legacyUnsealed) return "review_required";
   return "ready";
 }
+
+export function validateBackupStructure(
+  tables: unknown,
+  counts: unknown,
+  maxRowsPerTable: number
+): { valid: true; tables: BackupTables; counts: Record<string, unknown> } | { valid: false; reason: string } {
+  if (!tables || typeof tables !== "object" || Array.isArray(tables) ||
+      !counts || typeof counts !== "object" || Array.isArray(counts)) {
+    return { valid: false, reason: "tables_and_counts_must_be_objects" };
+  }
+  const tableData = tables as Record<string, unknown>;
+  const countData = counts as Record<string, unknown>;
+  const expected = BACKUP_TABLES.map(([name]) => name);
+  if (Object.keys(tableData).length !== expected.length ||
+      expected.some(name => !Object.prototype.hasOwnProperty.call(tableData, name)) ||
+      Object.keys(tableData).some(name => !expected.includes(name as typeof expected[number]))) {
+    return { valid: false, reason: "unexpected_or_missing_tables" };
+  }
+  if (Object.keys(countData).length !== expected.length ||
+      expected.some(name => !Object.prototype.hasOwnProperty.call(countData, name)) ||
+      Object.keys(countData).some(name => !expected.includes(name as typeof expected[number]))) {
+    return { valid: false, reason: "unexpected_or_missing_counts" };
+  }
+  for (const name of expected) {
+    const rows = tableData[name];
+    if (!Array.isArray(rows) || rows.length > maxRowsPerTable || countData[name] !== rows.length) {
+      return { valid: false, reason: "invalid_table_rows_or_count" };
+    }
+    if (rows.some(row => !row || typeof row !== "object" || Array.isArray(row))) {
+      return { valid: false, reason: "invalid_row_shape" };
+    }
+  }
+  return { valid: true, tables: tableData as BackupTables, counts: countData };
+}
