@@ -4,6 +4,7 @@ import { getOwnerSession } from "@/lib/auth/owner";
 import {
   createBackupSignature,
   decryptPrivateData,
+  encryptPrivateData,
   verifyBackupSignature,
   verifyMemoryIntegrityDigest
 } from "@/lib/security/encryption";
@@ -144,17 +145,26 @@ export async function GET() {
       }, { status: 409, headers: { "Cache-Control": "no-store" } });
     }
 
-    const unsigned = {
+    const createdAt = new Date().toISOString();
+    const payload = {
       format: "friday-ai-owner-backup",
       version: 1,
       ownerId: context.owner.id,
-      createdAt: new Date().toISOString(),
+      createdAt,
       counts,
       integrityReport,
       tables
     };
-    const signature = createBackupSignature(context.owner.id, JSON.stringify(unsigned));
-    const backup = { ...unsigned, signature };
+    const ciphertext = encryptPrivateData(JSON.stringify(payload));
+    const unsignedEnvelope = {
+      format: "friday-ai-owner-backup",
+      version: 1,
+      ownerId: context.owner.id,
+      createdAt,
+      ciphertext
+    };
+    const signature = createBackupSignature(context.owner.id, JSON.stringify(unsignedEnvelope));
+    const backup = { ...unsignedEnvelope, signature };
     const body = JSON.stringify(backup);
     if (new TextEncoder().encode(body).byteLength > MAX_BACKUP_BYTES) return fail("Backup exceeds the safe export size limit.", 413);
     return new NextResponse(body, {
@@ -191,32 +201,42 @@ export async function POST(request: Request) {
     } catch { return fail("Backup file is not valid JSON.", 400); }
 
     if (input.format !== "friday-ai-owner-backup" || input.version !== 1 || input.ownerId !== context.owner.id ||
-        typeof input.createdAt !== "string" || typeof input.signature !== "string" ||
-        !input.tables || typeof input.tables !== "object" || Array.isArray(input.tables) ||
-        !input.counts || typeof input.counts !== "object" || Array.isArray(input.counts)) {
+        typeof input.createdAt !== "string" || typeof input.signature !== "string" || typeof input.ciphertext !== "string") {
       return fail("Backup format, version or owner does not match this FRIDAY account.", 400);
     }
+    const unsignedEnvelope = {
+      format: input.format,
+      version: input.version,
+      ownerId: input.ownerId,
+      createdAt: input.createdAt,
+      ciphertext: input.ciphertext
+    };
+    if (!verifyBackupSignature(context.owner.id, JSON.stringify(unsignedEnvelope), input.signature)) {
+      return fail("Backup signature is invalid. The file may have been altered or signed with a different encryption key.", 409);
+    }
 
-    const tables = input.tables as BackupTables;
-    const counts = input.counts as Record<string, unknown>;
+    let payload: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(decryptPrivateData(input.ciphertext));
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return fail("Backup payload is invalid.", 400);
+      payload = parsed as Record<string, unknown>;
+    } catch {
+      return fail("Backup payload could not be decrypted. Check the matching FRIDAY encryption key.", 409);
+    }
+    if (payload.format !== input.format || payload.version !== input.version ||
+        payload.ownerId !== context.owner.id || payload.createdAt !== input.createdAt ||
+        !payload.tables || typeof payload.tables !== "object" || Array.isArray(payload.tables) ||
+        !payload.counts || typeof payload.counts !== "object" || Array.isArray(payload.counts)) {
+      return fail("Decrypted backup payload does not match its signed envelope.", 409);
+    }
+
+    const tables = payload.tables as BackupTables;
+    const counts = payload.counts as Record<string, unknown>;
     for (const [table] of TABLES) {
       if (!Array.isArray(tables[table]) || tables[table].length > MAX_ROWS_PER_TABLE || counts[table] !== tables[table].length) {
         return fail("Backup table structure or row counts are invalid.", 400);
       }
     }
-    const unsigned = {
-      format: input.format,
-      version: input.version,
-      ownerId: input.ownerId,
-      createdAt: input.createdAt,
-      counts,
-      integrityReport: input.integrityReport,
-      tables
-    };
-    if (!verifyBackupSignature(context.owner.id, JSON.stringify(unsigned), input.signature)) {
-      return fail("Backup signature is invalid. The file may have been altered or signed with a different encryption key.", 409);
-    }
-
     const actualReport = inspectTables(context.owner.id, tables);
     const readiness = reportReadiness(actualReport);
     return NextResponse.json({
