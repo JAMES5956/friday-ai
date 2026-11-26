@@ -32,6 +32,7 @@ export default function WorkspaceClient() {
   const [conversationId, setConversationId] = useState<string>();
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [includeMemory, setIncludeMemory] = useState(false);
+  const [knowledgeRecordIds, setKnowledgeRecordIds] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState("");
   const [memories, setMemories] = useState<MemoryItem[]>([]);
@@ -240,6 +241,14 @@ export default function WorkspaceClient() {
   useEffect(() => { void loadMemories(); void loadSecurityEvents(); void loadConversations(true); return () => { recognitionRef.current?.stop(); window.speechSynthesis?.cancel(); }; // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
+    const receiveKnowledgeSelection = (event: Event) => {
+      const ids = (event as CustomEvent<string[]>).detail;
+      if (Array.isArray(ids) && ids.length <= 5 && ids.every(id => typeof id === "string")) setKnowledgeRecordIds(ids);
+    };
+    window.addEventListener("friday:knowledge-context", receiveKnowledgeSelection);
+    return () => window.removeEventListener("friday:knowledge-context", receiveKnowledgeSelection);
+  }, []);
+  useEffect(() => {
     const refreshConversations = () => { void loadConversations(); };
     window.addEventListener("friday:conversation-refresh", refreshConversations);
     return () => window.removeEventListener("friday:conversation-refresh", refreshConversations);
@@ -257,13 +266,15 @@ export default function WorkspaceClient() {
       const response = await fetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: content, conversationId, includeMemory })
+        body: JSON.stringify({ message: content, conversationId, includeMemory, knowledgeRecordIds })
       });
       const payload = await response.json();
       if (!response.ok) {
         setStatus(payload.error?.message ?? "FRIDAY could not complete the request.");
         return;
       }
+      setKnowledgeRecordIds([]);
+      window.dispatchEvent(new Event("friday:knowledge-context-cleared"));
       setConversationId(payload.conversationId);
       setModelTier(payload.modelTier);
       setSpecialistRecommendation(payload.specialistRecommendation ?? null);
