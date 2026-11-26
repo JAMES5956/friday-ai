@@ -33,7 +33,7 @@ export async function GET() {
     if (rateError) return fail("NEXUS rate protection is unavailable. Apply the security migration.", 503);
     if (!allowed) return fail("Too many integrity scans. Wait before scanning again.", 429);
 
-    const [personalResult, agentResult, archiveResult, projectResult] = await Promise.all([
+    const [personalResult, agentResult, archiveResult, projectResult, messageResult, taskResult, taskEventResult] = await Promise.all([
       context.supabase.from("memories").select("id, category, content, integrity_digest, integrity_version, updated_at")
         .eq("user_id", context.owner.id).eq("retained", true).order("updated_at", { ascending: false }).limit(MAX_SCAN),
       context.supabase.from("agent_memories").select("id, agent_id, content_ciphertext, integrity_digest, integrity_version, updated_at")
@@ -41,17 +41,23 @@ export async function GET() {
       context.supabase.from("knowledge_records").select("id, record_type, payload_ciphertext, integrity_digest, integrity_version, updated_at")
         .eq("owner_id", context.owner.id).order("updated_at", { ascending: false }).limit(MAX_SCAN),
       context.supabase.from("project_records").select("id, payload_ciphertext, integrity_digest, integrity_version, updated_at")
-        .eq("owner_id", context.owner.id).order("updated_at", { ascending: false }).limit(MAX_SCAN)
+        .eq("owner_id", context.owner.id).order("updated_at", { ascending: false }).limit(MAX_SCAN),
+      context.supabase.from("messages").select("id, role, content, created_at").eq("user_id", context.owner.id)
+        .in("role", ["user", "assistant"]).order("created_at", { ascending: false }).limit(MAX_SCAN),
+      context.supabase.from("agent_tasks").select("id, title, task_ciphertext, result_ciphertext, created_at").eq("owner_id", context.owner.id)
+        .order("created_at", { ascending: false }).limit(MAX_SCAN),
+      context.supabase.from("agent_task_events").select("id, event_type, details_ciphertext, created_at").eq("owner_id", context.owner.id)
+        .order("created_at", { ascending: false }).limit(MAX_SCAN)
     ]);
-    if (personalResult.error || agentResult.error || archiveResult.error || projectResult.error) {
+    if (personalResult.error || agentResult.error || archiveResult.error || projectResult.error || messageResult.error || taskResult.error || taskEventResult.error) {
       return fail("NEXUS could not scan every protected store. Confirm migrations 0006–0009 are applied.", 503);
     }
 
-    const records: Array<{id:string;category:string;updatedAt:string;status:"verified"|"legacy_unsealed"|"tampered"|"unreadable";sealable:boolean}> = [];
+    const records: Array<{id:string;category:string;updatedAt:string;status:"verified"|"authenticated"|"legacy_unsealed"|"tampered"|"unreadable";sealable:boolean}> = [];
     const inspect = (rows: Array<Record<string, unknown>>, category: (row: Record<string, unknown>) => string,
       ciphertextField: string, domain: string, sealable = false) => {
       for (const row of rows) {
-        let status: "verified"|"legacy_unsealed"|"tampered"|"unreadable";
+        let status: "verified"|"authenticated"|"legacy_unsealed"|"tampered"|"unreadable";
         const ciphertext = row[ciphertextField];
         const hasDigest = row.integrity_digest !== null || row.integrity_version !== null;
         if (typeof row.id !== "string" || typeof ciphertext !== "string") status = "unreadable";
@@ -73,8 +79,32 @@ export async function GET() {
     inspect((archiveResult.data ?? []) as unknown as Array<Record<string,unknown>>, row => "Knowledge archive · " + String(row.record_type ?? "Record"), "payload_ciphertext", "knowledge");
     inspect((projectResult.data ?? []) as unknown as Array<Record<string,unknown>>, () => "Project record", "payload_ciphertext", "project");
 
+    const inspectAuthenticated = (rows: Array<Record<string, unknown>>, category: (row: Record<string, unknown>) => string,
+      fields: Array<{ name: string; optional?: boolean }>) => {
+      for (const row of rows) for (const field of fields) {
+        const ciphertext = row[field.name];
+        if (ciphertext == null && field.optional) continue;
+        let status: "authenticated" | "unreadable";
+        try {
+          if (typeof ciphertext !== "string") throw new Error("Missing encrypted field");
+          decryptPrivateData(ciphertext);
+          status = "authenticated";
+        } catch { status = "unreadable"; }
+        records.push({ id: String(row.id) + ":" + field.name,
+          category: category(row) + (fields.length > 1 ? " · " + (field.name === "task_ciphertext" ? "task" : "result") : ""),
+          updatedAt: String(row.created_at ?? ""), status, sealable: false });
+      }
+    };
+    inspectAuthenticated((messageResult.data ?? []) as unknown as Array<Record<string,unknown>>,
+      row => "Conversation · " + String(row.role ?? "message"), [{ name: "content" }]);
+    inspectAuthenticated((taskResult.data ?? []) as unknown as Array<Record<string,unknown>>,
+      row => "Specialist task · " + String(row.title ?? "Untitled"), [{ name: "task_ciphertext" }, { name: "result_ciphertext", optional: true }]);
+    inspectAuthenticated((taskEventResult.data ?? []) as unknown as Array<Record<string,unknown>>,
+      row => "Task event · " + String(row.event_type ?? "event"), [{ name: "details_ciphertext", optional: true }]);
+
     const counts = {
       verified: records.filter(item => item.status === "verified").length,
+      authenticated: records.filter(item => item.status === "authenticated").length,
       legacy_unsealed: records.filter(item => item.status === "legacy_unsealed").length,
       tampered: records.filter(item => item.status === "tampered").length,
       unreadable: records.filter(item => item.status === "unreadable").length
