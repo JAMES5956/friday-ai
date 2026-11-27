@@ -13,7 +13,7 @@ function fail(code: string, message: string, status: number) {
 async function context(agentId: string) {
   const agent = specialistAgents.find(item => item.id === agentId);
   if (!agent || agent.id === "friday" || agent.id === "nexus") return { response: fail("INVALID_AGENT", "FRIDAY and NEXUS cannot receive specialist memory grants.", 400) };
-  const owner = await getOwnerSession();
+  const owner = await getOwnerSession({ requireMfa: true });
   if (!owner.user) return { response: fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401) };
   const supabase = await createClient();
   return { agent, owner, supabase };
