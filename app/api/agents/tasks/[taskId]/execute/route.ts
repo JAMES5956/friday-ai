@@ -20,7 +20,7 @@ export async function POST(_request: Request, context: { params: Promise<{ taskI
   let claimedByThisRequest = false;
   if (!UUID.test(taskId)) return fail("INVALID_TASK", "Task identifier is invalid.", 400);
   try {
-    const owner = await getOwnerSession();
+    const owner = await getOwnerSession({ requireMfa: true });
     if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
     const supabase = await createClient();
     recoveryClient = supabase;
