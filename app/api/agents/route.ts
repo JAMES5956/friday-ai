@@ -13,7 +13,7 @@ function fail(code: string, message: string, status: number) {
 }
 
 async function getOwnerAndDatabase() {
-  const owner = await getOwnerSession();
+  const owner = await getOwnerSession({ requireMfa: true });
   if (!owner.user) return { response: fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401) };
   const supabase = await createClient();
   return { owner, supabase };
