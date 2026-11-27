@@ -38,8 +38,16 @@ function fail(message: string, status: number) {
 }
 
 async function ownerContext() {
-  const owner = await getOwnerSession();
-  if (!owner.user) return { response: fail("Owner authentication required.", 401) } as const;
+  const owner = await getOwnerSession({ requireMfa: true });
+  if (!owner.user) {
+    const status = owner.reason === "MFA_REQUIRED" ? 403 : owner.reason === "MFA_CHECK_FAILED" ? 503 : 401;
+    const message = owner.reason === "MFA_REQUIRED"
+      ? "Verify your authenticator before accessing owner backups."
+      : owner.reason === "MFA_CHECK_FAILED"
+        ? "NEXUS could not verify the current authentication assurance level."
+        : "Owner authentication required.";
+    return { response: fail(message, status) } as const;
+  }
   const supabase = await createClient();
   return { owner: owner.user, supabase } as const;
 }
