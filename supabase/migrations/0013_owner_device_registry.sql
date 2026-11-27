@@ -21,7 +21,8 @@ create index if not exists owner_devices_owner_status_idx
 
 alter table public.owner_devices enable row level security;
 revoke all on public.owner_devices from anon, authenticated;
-grant select, insert, update on public.owner_devices to authenticated;
+grant select, insert on public.owner_devices to authenticated;
+grant update (status, revoked_at) on public.owner_devices to authenticated;
 
 create policy "Owners read their registered devices"
   on public.owner_devices for select to authenticated
@@ -33,8 +34,8 @@ create policy "Owners register their own devices"
 
 create policy "Owners update their own device records"
   on public.owner_devices for update to authenticated
-  using ((select auth.uid()) = owner_id)
-  with check ((select auth.uid()) = owner_id);
+  using ((select auth.uid()) = owner_id and status = 'active')
+  with check ((select auth.uid()) = owner_id and status = 'revoked' and revoked_at is not null);
 
 comment on table public.owner_devices is
   'Owner-scoped device inventory. Device registration requires owner MFA; public keys are stored for future proof-of-possession flows. Revocation is retained rather than deleted.';
