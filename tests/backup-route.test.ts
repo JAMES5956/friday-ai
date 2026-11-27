@@ -111,7 +111,9 @@ describe("NEXUS backup recovery route safety", () => {
 
     expect(response.status).toBe(503);
     expect(from).toHaveBeenCalledWith("security_audit_events");
-    expect(bodyOf(response)).resolves.toMatchObject({ error: expect.stringContaining("audit") });
+    await expect(bodyOf(response)).resolves.toMatchObject({
+      error: expect.stringContaining("audit")
+    });
   });
 });
 
