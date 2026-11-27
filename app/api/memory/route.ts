@@ -15,7 +15,7 @@ async function getDatabaseClient() {
 
 async function requireOwner() {
   try {
-    const owner = await getOwnerSession();
+    const owner = await getOwnerSession({ requireMfa: true });
     return owner.user
       ? { user: owner.user, error: null }
       : { user: null, error: NextResponse.json({ error: "Owner authentication required." }, { status: 401 }) };
