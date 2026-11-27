@@ -10,10 +10,11 @@ export const dynamic = "force-dynamic";
 export default async function CompanyPage() {
   let session;
   try {
-    session = await getOwnerSession();
+    session = await getOwnerSession({ requireMfa: true });
   } catch {
     redirect("/login?setup=required");
   }
+  if (!session.user && session.reason === "MFA_REQUIRED") redirect("/security?mode=verify");
   if (!session.user) redirect("/login");
 
   return (
