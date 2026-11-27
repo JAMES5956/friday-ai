@@ -31,6 +31,8 @@ grant update (status, revoked_at) on table public.owner_devices to authenticated
 drop policy if exists "Owners read their registered devices" on public.owner_devices;
 drop policy if exists "Owners register their own devices" on public.owner_devices;
 drop policy if exists "Owners update their own device records" on public.owner_devices;
+drop policy if exists "Owners register their own active devices" on public.owner_devices;
+drop policy if exists "Owners revoke their active devices" on public.owner_devices;
 
 create policy "Owners read their registered devices"
   on public.owner_devices for select to authenticated
