@@ -6,7 +6,7 @@ FRIDAY is being built as Victor's private, voice-first personal assistant and th
 
 The repository now contains:
 - Responsive public landing page and private owner workspace.
-- Supabase Auth integration with a server-enforced owner email allowlist.
+- Supabase Auth integration with a server-enforced owner email allowlist and TOTP MFA enrollment, sign-in challenge and step-up assurance checks for protected owner routes.
 - Middleware protection for the private workspace and assistant API.
 - Supabase database schema with row-level security for profiles, conversations, messages, memories, security audit events and isolated specialist-agent workspaces/tasks.
 - AES-256-GCM application-layer encryption for stored conversation and memory content.
@@ -22,9 +22,9 @@ The repository now contains:
 - Encrypted Project Continuity workspace for owner-managed project objectives, status, priority, specialist ownership, dated milestones and tasks, progress updates and blockers. Project records are owner-scoped and are not included in model context automatically; the owner may explicitly select up to three active projects for one message, after which the selection clears.
 - NEXUS Backup & Recovery: owner-scoped portable backups of encrypted data and required metadata, HMAC-signed manifests, ciphertext and record-integrity verification, and non-destructive recovery dry runs. No automatic restore or overwrite is enabled.
 - FRIDAY can review completed specialist outputs, challenge assumptions and save its synthesis into the owner conversation history.
-- Automated lint, TypeScript and production-build checks.
+- Owner device inventory API with MFA-gated registration and one-way revocation; public-key proof-of-possession and device client UI are not implemented yet.\n- Automated dependency audit, lint, unit tests, TypeScript and production-build checks.
 
-This is a pre-deployment build. No public deployment has been performed. The application still requires private infrastructure configuration before authentication, database-backed memory and model responses can run.
+The connected Vercel project automatically creates production-target deployments on pushes to main; the project has SSO deployment protection and the latest code must pass CI/build checks before it is considered ready. No manual production promotion or live Supabase migration was performed as part of this work. Authentication, database-backed memory and model responses still require private infrastructure configuration and end-to-end verification.
 
 ## Design documentation
 
@@ -57,7 +57,7 @@ Requirements: Node.js 20.9+ and npm.
 3. In Supabase Authentication, enable email/password sign-in and disable public sign-ups.
 4. Create the owner account manually in the Supabase dashboard.
 5. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `FRIDAY_OWNER_EMAIL`.
-6. Run the SQL migrations in order: `0001_friday_core.sql`, `0002_nexus_rate_limits.sql`, `0003_agent_workspaces.sql`, `0004_task_approval_workflow.sql`, `0005_agent_memory_grant_guards.sql`, `0006_memory_lifecycle.sql`, `0007_knowledge_decision_archive.sql`, `0008_project_continuity.sql`, and `0009_memory_integrity.sql`.
+6. Apply only migrations that are not already recorded, in order: `0001_friday_core.sql` through `0013_owner_device_registry.sql`. Verify the Supabase migration history first. Migrations `0012` and `0013` are committed but have not been applied to the live project.
 7. Generate an application encryption key locally with `openssl rand -base64 32` and set `FRIDAY_DATA_ENCRYPTION_KEY`. Keep a secure offline backup of this key. Losing it makes encrypted stored data unrecoverable.
 8. Configure `AI_BASE_URL`, `AI_MODEL`, and `AI_API_KEY` only after choosing and approving a model provider. The API key is server-only and must never use a `NEXT_PUBLIC_` prefix.
 9. To enable a specialist, also set its dedicated model variable (for example `AI_ORACLE_MODEL` or `AI_FORGE_MODEL`). Specialist execution deliberately has no fallback to `AI_MODEL`; each delegated agent must have its own configured model. All configured models use the shared server-side provider URL and key.
@@ -93,14 +93,14 @@ GitHub Actions runs the same checks for commits to `main` and `foundation/**` br
 - A model provider must be configured before FRIDAY can generate responses.
 - Specialist tasks run only after an explicit owner action. Sensitive tasks additionally require recorded owner approval. Specialist models receive their own working memories plus only the non-restricted memories the owner explicitly shares with them. Sharing grants expire and can be revoked; restricted memories are never shared.
 - Specialist workers return text results only. They cannot call tools, send communications, publish, make purchases or control devices.
-- Voice, telephony, device control, emergency protocols and the virtual headquarters are not yet operational.
+- Voice, telephony, device control, emergency protocols and the virtual headquarters are not yet operational. Browser voice input is only a foreground prototype. Device registration currently records inventory metadata; it does not yet cryptographically prove device possession.
 - No paid service is activated automatically.
 
 ## Pre-deployment checklist
 
 - [ ] Create and configure the private Supabase project.
 - [ ] Verify the owner account and sign-in flow against the live Supabase project.
-- [ ] Run the SQL migration and verify row-level security with negative cross-user tests.
+- [ ] Review and explicitly approve pending migrations 0012–0013, then apply them and verify row-level security with negative cross-user tests.\n- [ ] Complete MFA enrollment/sign-in tests against the live owner account and test authenticator recovery.\n- [ ] Implement device proof-of-possession before treating registered devices as trusted endpoints.
 - [ ] Securely store and back up the encryption key; test encryption/decryption and recovery.
 - [ ] Select and approve the AI provider and its cost/retention terms.
 - [ ] Add request rate limiting, audit review and security tests.
