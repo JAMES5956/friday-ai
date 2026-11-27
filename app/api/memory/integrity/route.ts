@@ -20,7 +20,7 @@ function fail(message: string, status: number) {
 }
 
 async function ownerContext() {
-  const owner = await getOwnerSession();
+  const owner = await getOwnerSession({ requireMfa: true });
   if (!owner.user) return { response: fail("Owner authentication required.", 401) } as const;
   const supabase = await createClient();
   return { owner: owner.user, supabase } as const;
