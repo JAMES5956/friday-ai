@@ -94,7 +94,7 @@ export async function POST(request: Request) {
 
       const { data: factors, error: factorsError } = await context.supabase.auth.mfa.listFactors();
       if (factorsError) return fail("MFA_UNAVAILABLE", "Could not inspect authentication factors.", 503);
-      const factor = factors.totp.find(item => item.id === payload.factorId && item.status === "unverified");
+      const factor = factors.totp.find(item => item.id === payload.factorId && String(item.status) === "unverified");
       if (!factor) return fail("MFA_FACTOR_NOT_FOUND", "The pending authenticator factor was not found.", 404);
 
       const { data: challenge, error: challengeError } =
