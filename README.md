@@ -57,7 +57,7 @@ Requirements: Node.js 20.9+ and npm.
 3. In Supabase Authentication, enable email/password sign-in and disable public sign-ups.
 4. Create the owner account manually in the Supabase dashboard.
 5. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `FRIDAY_OWNER_EMAIL`.
-6. Apply only migrations that are not already recorded, in order: `0001_friday_core.sql` through `0014_correct_live_security_permissions.sql`. Verify the Supabase migration history first. The live project has migrations 0001–0014 recorded; do not reapply them.
+6. Apply only migrations that are not already recorded, in order: `0001_friday_core.sql` through `0013_owner_device_registry.sql`, followed by `20261127075441_correct_live_security_permissions.sql`. Verify the Supabase migration history first. The live project has migrations 0001–0014 recorded; do not reapply them.
 7. Generate an application encryption key locally with `openssl rand -base64 32` and set `FRIDAY_DATA_ENCRYPTION_KEY`. Keep a secure offline backup of this key. Losing it makes encrypted stored data unrecoverable.
 8. Configure `AI_BASE_URL`, `AI_MODEL`, and `AI_API_KEY` only after choosing and approving a model provider. The API key is server-only and must never use a `NEXT_PUBLIC_` prefix.
 9. To enable a specialist, also set its dedicated model variable (for example `AI_ORACLE_MODEL` or `AI_FORGE_MODEL`). Specialist execution deliberately has no fallback to `AI_MODEL`; each delegated agent must have its own configured model. All configured models use the shared server-side provider URL and key.
