@@ -13,7 +13,7 @@ function fail(message: string, status: number) {
   return NextResponse.json({ error: message }, { status, headers: { "Cache-Control": "no-store" } });
 }
 async function ownerAndDb() {
-  const owner = await getOwnerSession();
+  const owner = await getOwnerSession({ requireMfa: true });
   if (!owner.user) return { error: fail("Owner authentication required.", 401) } as const;
   const supabase = await createClient();
   return { owner: owner.user, supabase } as const;
