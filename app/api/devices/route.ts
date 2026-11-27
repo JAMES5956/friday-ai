@@ -73,8 +73,7 @@ export async function POST(request: Request) {
       device_id: payload.deviceId,
       device_name: payload.deviceName.trim(),
       platform: payload.platform,
-      public_key: payload.publicKey,
-      status: "active"
+      public_key: payload.publicKey
     }).select("id, device_id, device_name, platform, status, created_at").single();
 
     if (error?.code === "23505") return fail("DEVICE_ALREADY_REGISTERED", "This device is already registered.", 409);
