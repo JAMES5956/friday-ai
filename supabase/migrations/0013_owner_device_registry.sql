@@ -24,6 +24,10 @@ revoke all on public.owner_devices from anon, authenticated;
 grant select, insert on public.owner_devices to authenticated;
 grant update (status, revoked_at) on public.owner_devices to authenticated;
 
+drop policy if exists "Owners read their registered devices" on public.owner_devices;
+drop policy if exists "Owners register their own devices" on public.owner_devices;
+drop policy if exists "Owners update their own device records" on public.owner_devices;
+
 create policy "Owners read their registered devices"
   on public.owner_devices for select to authenticated
   using ((select auth.uid()) = owner_id);
@@ -38,6 +42,6 @@ create policy "Owners update their own device records"
   with check ((select auth.uid()) = owner_id and status = 'revoked' and revoked_at is not null);
 
 comment on table public.owner_devices is
-  'Owner-scoped device inventory. Device registration requires owner MFA; public keys are stored for future proof-of-possession flows. Revocation is retained rather than deleted.';
+  'Owner-scoped device inventory. Device registration requires owner MFA; public keys are inventory metadata only until proof-of-possession is implemented. Revocation is retained rather than deleted.';
 comment on column public.owner_devices.public_key is
   'Device public key only. The matching private key must remain on the device and must never be uploaded.';
