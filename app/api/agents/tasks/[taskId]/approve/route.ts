@@ -13,7 +13,7 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
   const { taskId } = await context.params;
   if (!UUID.test(taskId)) return fail("INVALID_TASK", "Task identifier is invalid.", 400);
   try {
-    const owner = await getOwnerSession();
+    const owner = await getOwnerSession({ requireMfa: true });
     if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
     const supabase = await createClient();
     const { data: withinLimit, error: rateError } = await supabase.rpc("consume_rate_limit", { p_limit: 10 });
