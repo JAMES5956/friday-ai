@@ -27,8 +27,8 @@ describe("live NEXUS permission correction", () => {
   });
 
   it("allows only owner-scoped registration and irreversible revocation", () => {
-    expect(migration).toMatch(/status = 'active' and revoked_at is null/i);
-    expect(migration).toMatch(/status = 'revoked' and revoked_at is not null/i);
+    expect(migration).toMatch(/status = 'active'\\s+and revoked_at is null/i);
+    expect(migration).toMatch(/status = 'revoked'\\s+and revoked_at is not null/i);
     expect(migration).toMatch(/auth\.uid\(\)\) = owner_id/i);
   });
 });
