@@ -86,7 +86,7 @@ GitHub Actions runs the same checks for commits to `main` and `foundation/**` br
 
 - Never commit real keys, passwords, tokens, private keys or recovery codes.
 - The owner email allowlist is enforced server-side; public registration is not part of the application.
-- Database tables use row-level security so authenticated users can only access rows belonging to their own auth user ID.
+- Database tables use row-level security so authenticated users can only access rows belonging to their own auth user ID. The rate-limit counter table intentionally has no client policies or direct API grants; the `consume_rate_limit` SECURITY DEFINER RPC is intentionally executable by authenticated sessions because owner-scoped API routes call it with their user JWT. It binds counters to `auth.uid()` and clamps caller-supplied limits to 1–60 per minute. Supabase may continue to report this intentional RPC exposure and the no-policy private table as advisor findings.
 - Conversation, memory, task, result, project and knowledge/decision payloads are encrypted before they are written to PostgreSQL. Keep the encryption key separate from the database and back it up securely.
 - If the encryption key is missing or invalid, private storage endpoints fail closed.
 - The assistant route does not execute external actions. Sensitive or potentially irreversible delegated tasks remain blocked until the owner records approval in the task workflow.
