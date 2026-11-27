@@ -30,7 +30,12 @@ export default function LoginPage() {
       const { data } = await supabase.auth.getUser();
       if (!data.user) throw new Error("Could not verify the signed-in account.");
 
-      router.replace("/workspace");
+      const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (assuranceError) throw assuranceError;
+      const destination = assurance.nextLevel === "aal2" && assurance.currentLevel !== "aal2"
+        ? "/security?mode=verify"
+        : "/workspace";
+      router.replace(destination);
       router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Sign-in failed. Try again.");
