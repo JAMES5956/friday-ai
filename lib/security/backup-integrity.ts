@@ -22,7 +22,8 @@ export const BACKUP_TABLES = [
   ["agent_tasks", "owner_id"],
   ["agent_task_events", "owner_id"],
   ["knowledge_records", "owner_id"],
-  ["project_records", "owner_id"]
+  ["project_records", "owner_id"],
+  ["owner_devices", "owner_id"]
 ] as const;
 
 export function inspectBackupTables(ownerId: string, tables: BackupTables): IntegrityReport {
