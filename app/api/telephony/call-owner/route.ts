@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
   let owner;
   try {
-    owner = await getOwnerSession();
+    owner = await getOwnerSession({ requireMfa: true });
   } catch {
     return fail("AUTH_NOT_CONFIGURED", "Owner authentication is not configured.", 503);
   }
