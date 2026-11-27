@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET() {
   let owner;
   try {
-    owner = await getOwnerSession();
+    owner = await getOwnerSession({ requireMfa: true });
   } catch {
     return NextResponse.json({ error: "Authentication is not configured." }, { status: 503 });
   }
