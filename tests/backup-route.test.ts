@@ -76,6 +76,7 @@ describe("NEXUS backup recovery route safety", () => {
 
   it("verifies a valid backup as a dry run and writes only its security audit event", async () => {
     const response = await POST(makeRequest(makeBackup()));
+    if (!response) throw new Error("Backup route returned no response.");
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -95,6 +96,7 @@ describe("NEXUS backup recovery route safety", () => {
     const backup = makeBackup();
     backup.signature = "0".repeat(64);
     const response = await POST(makeRequest(backup));
+    if (!response) throw new Error("Backup route returned no response.");
 
     expect(response.status).toBe(409);
     expect(from).not.toHaveBeenCalled();
@@ -108,6 +110,7 @@ describe("NEXUS backup recovery route safety", () => {
     }));
 
     const response = await POST(makeRequest(makeBackup()));
+    if (!response) throw new Error("Backup route returned no response.");
 
     expect(response.status).toBe(503);
     expect(from).toHaveBeenCalledWith("security_audit_events");
