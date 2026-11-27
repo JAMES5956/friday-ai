@@ -16,7 +16,7 @@ function fail(code: string, message: string, status: number) {
 
 export async function GET() {
   try {
-    const owner = await getOwnerSession();
+    const owner = await getOwnerSession({ requireMfa: true });
     if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
     const supabase = await createClient();
     const { data, error } = await supabase.from("agent_tasks")
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
   if (typeof input.description !== "string" || !input.description.trim() || input.description.length > 10000) return fail("INVALID_DESCRIPTION", "Task description must be 1–10,000 characters.", 400);
 
   try {
-    const owner = await getOwnerSession();
+    const owner = await getOwnerSession({ requireMfa: true });
     if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
     const supabase = await createClient();
     const { data: withinLimit, error: rateError } = await supabase.rpc("consume_rate_limit", { p_limit: 10 });
