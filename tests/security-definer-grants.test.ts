@@ -17,6 +17,12 @@ describe("NEXUS SECURITY DEFINER execution grants", () => {
     );
   });
 
+  it("blocks direct client access to the private rate-limit counter table", () => {
+    expect(migration).toMatch(
+      /revoke all on table public\\.rate_limit_counters from public, anon, authenticated, service_role/i
+    );
+  });
+
   it("makes the auth trigger function unavailable as a client-callable RPC", () => {
     expect(migration).toMatch(
       /revoke all on function public\.handle_new_friday_user\(\)\s+from public, anon, authenticated, service_role/i
