@@ -65,6 +65,27 @@ describe("owner session assurance", () => {
     expect(result.reason).toBe("MFA_REQUIRED");
   });
 
+  it("allows the owner when no second factor is enrolled", async () => {
+    createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "owner-1", email: "boss@example.test" } },
+          error: null
+        }),
+        signOut: vi.fn(),
+        mfa: {
+          getAuthenticatorAssuranceLevel: vi.fn().mockResolvedValue({
+            data: { currentLevel: "aal1", nextLevel: "aal1" },
+            error: null
+          })
+        }
+      }
+    });
+
+    const result = await getOwnerSession({ requireMfa: true });
+    expect(result.user?.id).toBe("owner-1");
+  });
+
   it("accepts protected owner operations only at aal2", async () => {
     createClient.mockResolvedValue({
       auth: {
