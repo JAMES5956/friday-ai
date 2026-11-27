@@ -19,7 +19,7 @@ describe("NEXUS SECURITY DEFINER execution grants", () => {
 
   it("blocks direct client access to the private rate-limit counter table", () => {
     expect(migration).toMatch(
-      /revoke all on table public\\.rate_limit_counters from public, anon, authenticated, service_role/i
+      /revoke all on table public\.rate_limit_counters from public, anon, authenticated, service_role/i
     );
   });
 
