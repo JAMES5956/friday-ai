@@ -24,7 +24,7 @@ function fail(code: string, message: string, status: number) {
 
 export async function GET(request: Request) {
   let owner;
-  try { owner = await getOwnerSession(); }
+  try { owner = await getOwnerSession({ requireMfa: true }); }
   catch { return fail("AUTH_NOT_CONFIGURED", "Owner authentication is not configured.", 503); }
   if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
 
@@ -92,7 +92,7 @@ export async function DELETE(request: Request) {
   if (typeof payload.conversationId !== "string" || !UUID_PATTERN.test(payload.conversationId)) return fail("INVALID_CONVERSATION", "Conversation identifier is invalid.", 400);
 
   let owner;
-  try { owner = await getOwnerSession(); }
+  try { owner = await getOwnerSession({ requireMfa: true }); }
   catch { return fail("AUTH_NOT_CONFIGURED", "Owner authentication is not configured.", 503); }
   if (!owner.user) return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner.", 401);
   let supabase: Awaited<ReturnType<typeof createClient>>;
@@ -162,7 +162,7 @@ export async function POST(request: Request) {
 
   let owner;
   try {
-    owner = await getOwnerSession();
+    owner = await getOwnerSession({ requireMfa: true });
   } catch {
     return fail("AUTH_NOT_CONFIGURED", "Owner authentication is not configured.", 503);
   }
