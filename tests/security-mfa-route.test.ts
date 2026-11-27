@@ -41,6 +41,7 @@ describe("owner MFA verification route", () => {
       body: JSON.stringify({ action: "verify", factorId, code: "123456" })
     }));
 
+    if (!response) throw new Error("MFA route returned no response.");
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       verified: true,
