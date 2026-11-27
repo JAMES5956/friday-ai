@@ -362,3 +362,44 @@ h1 span { color: var(--cyan); text-shadow: 0 0 35px rgba(112,228,244,.22); }
 .nexus-backup-issues{padding-left:20px;color:#ffaaaa;font-size:10px;line-height:1.7}
 .nexus-backup-note{color:var(--muted);font-size:10px;line-height:1.65;overflow-wrap:anywhere}
 @media(max-width:620px){.nexus-backup-panel{padding:16px}.nexus-backup-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+
+.mfa-enrollment {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  margin: 18px 0;
+  color: var(--muted, #9aa4b2);
+  text-align: center;
+  line-height: 1.6;
+}
+.mfa-qr {
+  width: 210px;
+  height: 210px;
+  padding: 10px;
+  border-radius: 14px;
+  background: #fff;
+}
+.mfa-secret {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
+  border: 1px solid var(--line, rgba(255,255,255,.14));
+  border-radius: 9px;
+  color: var(--foreground, #fff);
+  font-size: 13px;
+}
+.mfa-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 16px;
+}
+.mfa-actions a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
