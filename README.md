@@ -24,7 +24,7 @@ The repository now contains:
 - FRIDAY can review completed specialist outputs, challenge assumptions and save its synthesis into the owner conversation history.
 - Owner device inventory API with MFA-gated registration and one-way revocation; public-key proof-of-possession and device client UI are not implemented yet.\n- Automated dependency audit, lint, unit tests, TypeScript and production-build checks.
 
-The connected Vercel project automatically creates production-target deployments on pushes to main; the project has SSO deployment protection and the latest code must pass CI/build checks before it is considered ready. No manual production promotion or live Supabase migration was performed as part of this work. Authentication, database-backed memory and model responses still require private infrastructure configuration and end-to-end verification.
+The connected Vercel project automatically creates production-target deployments on pushes to main; the project has SSO deployment protection and the latest code must pass CI/build checks before it is considered ready. No manual production promotion was performed. Live Supabase migration 0014 was applied with no row deletions or data rewrites. Authentication, database-backed memory and model responses still require private infrastructure configuration and end-to-end verification.
 
 ## Design documentation
 
@@ -57,7 +57,7 @@ Requirements: Node.js 20.9+ and npm.
 3. In Supabase Authentication, enable email/password sign-in and disable public sign-ups.
 4. Create the owner account manually in the Supabase dashboard.
 5. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `FRIDAY_OWNER_EMAIL`.
-6. Apply only migrations that are not already recorded, in order: `0001_friday_core.sql` through `0013_owner_device_registry.sql`. Verify the Supabase migration history first. Migrations `0012` and `0013` are committed but have not been applied to the live project.
+6. Apply only migrations that are not already recorded, in order: `0001_friday_core.sql` through `0014_correct_live_security_permissions.sql`. Verify the Supabase migration history first. The live project has migrations 0001–0014 recorded; do not reapply them.
 7. Generate an application encryption key locally with `openssl rand -base64 32` and set `FRIDAY_DATA_ENCRYPTION_KEY`. Keep a secure offline backup of this key. Losing it makes encrypted stored data unrecoverable.
 8. Configure `AI_BASE_URL`, `AI_MODEL`, and `AI_API_KEY` only after choosing and approving a model provider. The API key is server-only and must never use a `NEXT_PUBLIC_` prefix.
 9. To enable a specialist, also set its dedicated model variable (for example `AI_ORACLE_MODEL` or `AI_FORGE_MODEL`). Specialist execution deliberately has no fallback to `AI_MODEL`; each delegated agent must have its own configured model. All configured models use the shared server-side provider URL and key.
@@ -103,7 +103,8 @@ GitHub Actions runs the same checks for commits to `main` and `foundation/**` br
 - [ ] Review and explicitly approve pending migrations 0012–0013, then apply them and verify row-level security with negative cross-user tests.\n- [ ] Complete MFA enrollment/sign-in tests against the live owner account and test authenticator recovery.\n- [ ] Implement device proof-of-possession before treating registered devices as trusted endpoints.
 - [ ] Securely store and back up the encryption key; test encryption/decryption and recovery.
 - [ ] Select and approve the AI provider and its cost/retention terms.
-- [ ] Add request rate limiting, audit review and security tests.
+- [x] Verify NEXUS rate-limit RPC permissions and remove direct client access to rate-limit counters.
+- [ ] Review the intentional SECURITY DEFINER rate-limit RPC exposure and monitor audit events.
 - [ ] Complete browser, mobile and accessibility testing, including device-specific voice support.
 - [ ] Complete independent security review.
 - [ ] Configure deployment secrets only after owner approval.
