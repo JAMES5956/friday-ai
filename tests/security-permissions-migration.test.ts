@@ -10,25 +10,25 @@ const migration = readFileSync(
 describe("live NEXUS permission correction", () => {
   it("removes direct access to rate-limit counters for API roles", () => {
     expect(migration).toMatch(
-      /revoke all privileges on table public\\.rate_limit_counters\\s+from public, anon, authenticated, service_role/i
+      /revoke all privileges on table public\.rate_limit_counters\s+from public, anon, authenticated, service_role/i
     );
   });
 
   it("limits owner-device insertion and update to the required columns", () => {
     expect(migration).toMatch(
-      /grant insert \\(owner_id, device_id, device_name, platform, public_key\\)\\s+on public\\.owner_devices to authenticated/i
+      /grant insert \(owner_id, device_id, device_name, platform, public_key\)\s+on public\.owner_devices to authenticated/i
     );
     expect(migration).toMatch(
-      /grant update \\(status, revoked_at\\)\\s+on public\\.owner_devices to authenticated/i
+      /grant update \(status, revoked_at\)\s+on public\.owner_devices to authenticated/i
     );
     expect(migration).not.toMatch(
-      /grant select, insert, update on (?:table )?public\\.owner_devices/i
+      /grant select, insert, update on (?:table )?public\.owner_devices/i
     );
   });
 
   it("allows only owner-scoped registration and irreversible revocation", () => {
     expect(migration).toMatch(/status = 'active' and revoked_at is null/i);
     expect(migration).toMatch(/status = 'revoked' and revoked_at is not null/i);
-    expect(migration).toMatch(/auth\\.uid\\(\\)\\) = owner_id/i);
+    expect(migration).toMatch(/auth\.uid\(\)\) = owner_id/i);
   });
 });
