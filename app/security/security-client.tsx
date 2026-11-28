@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { isTotpCode, normaliseTotpCode } from "@/lib/auth/totp-code";
 
 type Factor = { id: string; friendlyName: string | null; status: string };
 type Enrollment = { factorId: string; qrCode: string; secret: string };
@@ -61,7 +62,7 @@ export default function SecurityClient({ initialMode }: { initialMode: "setup" |
       setError("No authenticator factor is available. Start setup first.");
       return;
     }
-    if (!/^\\d{6,8}$/.test(code.trim())) {
+    if (!isTotpCode(code.trim())) {
       setError("Enter the current 6–8 digit authenticator code.");
       return;
     }
@@ -141,7 +142,7 @@ export default function SecurityClient({ initialMode }: { initialMode: "setup" |
               inputMode="numeric"
               autoComplete="one-time-code"
               value={code}
-              onChange={event => setCode(event.target.value.replace(/\\D/g, "").slice(0, 8))}
+              onChange={event => setCode(normaliseTotpCode(event.target.value))}
               placeholder="123456"
               required
             />
