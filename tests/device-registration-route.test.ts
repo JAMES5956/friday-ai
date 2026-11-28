@@ -52,6 +52,7 @@ describe("NEXUS device registration API", () => {
       })
     }));
 
+    if (!response) throw new Error("Route returned no response.");
     expect(response.status).toBe(400);
     expect(insert).not.toHaveBeenCalled();
   });
