@@ -22,7 +22,8 @@ The repository now contains:
 - Encrypted Project Continuity workspace for owner-managed project objectives, status, priority, specialist ownership, dated milestones and tasks, progress updates and blockers. Project records are owner-scoped and are not included in model context automatically; the owner may explicitly select up to three active projects for one message, after which the selection clears.
 - NEXUS Backup & Recovery: owner-scoped portable backups of encrypted data and required metadata, HMAC-signed manifests, ciphertext and record-integrity verification, and non-destructive recovery dry runs. No automatic restore or overwrite is enabled.
 - FRIDAY can review completed specialist outputs, challenge assumptions and save its synthesis into the owner conversation history.
-- Owner device inventory API with MFA-gated registration and one-way revocation. Device registration now validates Ed25519 public keys, and owner-bound, short-lived, single-use challenge/verification endpoints implement cryptographic proof-of-possession. A native device key-generation and signing client is still pending.\n- Automated dependency audit, lint, unit tests, TypeScript and production-build checks.
+- Owner device inventory API with MFA-gated registration and one-way revocation. Device registration now validates Ed25519 public keys, and owner-bound, short-lived, single-use challenge/verification endpoints implement cryptographic proof-of-possession. A native device key-generation and signing client is still pending.
+- Automated dependency audit, lint, unit tests, TypeScript and production-build checks.
 
 The connected Vercel project automatically creates production-target deployments on pushes to main; the project has SSO deployment protection. No manual production promotion was performed. Live Supabase migration 20261127075441 was applied with no row deletions or data rewrites. The device proof-of-possession migration 20261128124000 is staged in code and has not been applied to the live project. Authentication, device key enrollment, database-backed memory and model responses still require private infrastructure configuration and end-to-end verification.
 
@@ -100,7 +101,9 @@ GitHub Actions runs the same checks for commits to `main` and `foundation/**` br
 
 - [ ] Create and configure the private Supabase project.
 - [ ] Verify the owner account and sign-in flow against the live Supabase project.
-- [ ] Review and explicitly approve pending migrations 0012–0013, then apply them and verify row-level security with negative cross-user tests.\n- [ ] Complete MFA enrollment/sign-in tests against the live owner account and test authenticator recovery.\n- [ ] Implement device proof-of-possession before treating registered devices as trusted endpoints.
+- [ ] Review and explicitly approve the pending `20261128124000_device_proof_of_possession.sql` migration, then apply it and verify owner isolation, active-device checks and replay rejection.
+- [ ] Complete MFA enrollment/sign-in tests against the live owner account and test authenticator recovery.
+- [ ] Build the native device key-generation/signing client and complete end-to-end device proof-of-possession testing.
 - [ ] Securely store and back up the encryption key; test encryption/decryption and recovery.
 - [ ] Select and approve the AI provider and its cost/retention terms.
 - [x] Verify NEXUS rate-limit RPC permissions and remove direct client access to rate-limit counters.
