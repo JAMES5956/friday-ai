@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       ownerId: owner.user.id,
       deviceId,
       nonce,
-      expiresAt
+      expiresAt: String(Date.parse(expiresAt))
     });
 
     return NextResponse.json({
