@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnerSession } from "@/lib/auth/owner";
+import { isValidEd25519PublicKey } from "@/lib/security/device-proof";
 
 export const runtime = "nodejs";
 
@@ -64,8 +65,8 @@ export async function POST(request: Request) {
     if (typeof payload.deviceId !== "string" || !DEVICE_ID.test(payload.deviceId) ||
         typeof payload.deviceName !== "string" || payload.deviceName.trim().length < 1 || payload.deviceName.trim().length > 80 ||
         typeof payload.platform !== "string" || !PLATFORMS.has(payload.platform) ||
-        typeof payload.publicKey !== "string" || payload.publicKey.length < 32 || payload.publicKey.length > 8192) {
-      return fail("INVALID_DEVICE", "Provide a valid device ID, name, supported platform and public key.", 400);
+        typeof payload.publicKey !== "string" || payload.publicKey.length < 32 || payload.publicKey.length > 8192 || !isValidEd25519PublicKey(payload.publicKey)) {
+      return fail("INVALID_DEVICE", "Provide a valid device ID, name, supported platform and Ed25519 public key.", 400);
     }
 
     const { data, error } = await context.supabase.from("owner_devices").insert({
