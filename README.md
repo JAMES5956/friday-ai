@@ -94,7 +94,7 @@ GitHub Actions runs the same checks for commits to `main` and `foundation/**` br
 - A model provider must be configured before FRIDAY can generate responses.
 - Specialist tasks run only after an explicit owner action. Sensitive tasks additionally require recorded owner approval. Specialist models receive their own working memories plus only the non-restricted memories the owner explicitly shares with them. Sharing grants expire and can be revoked; restricted memories are never shared.
 - Specialist workers return text results only. They cannot call tools, send communications, publish, make purchases or control devices.
-- Voice, telephony, device control, emergency protocols and the virtual headquarters are not yet operational. Browser voice input is only a foreground prototype. Device registration currently records inventory metadata; it does not yet cryptographically prove device possession.
+- Voice, telephony, device control, emergency protocols and the virtual headquarters are not yet operational. Browser voice input is only a foreground prototype. Device proof-of-possession server code is staged, but the database migration and native key-generation/signing client are still pending; registered devices must not yet be treated as cryptographically trusted.
 - No paid service is activated automatically.
 
 ## Pre-deployment checklist
