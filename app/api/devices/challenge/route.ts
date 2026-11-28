@@ -40,6 +40,16 @@ export async function POST(request: Request) {
     const nonce = randomBytes(32).toString("base64url");
     const expiresAt = new Date(Date.now() + 120_000).toISOString();
     const supabase = await createClient();
+    const { data: allowed, error: rateError } = await supabase.rpc("consume_rate_limit", { p_limit: 10 });
+    if (rateError) return fail("SECURITY_LIMITER_UNAVAILABLE", "NEXUS request protection is unavailable.", 503);
+    if (!allowed) return fail("RATE_LIMITED", "Too many device challenges. Wait before trying again.", 429);
+
+    const { error: cleanupError } = await supabase.from("device_challenges")
+      .delete()
+      .eq("owner_id", owner.user.id)
+      .lt("expires_at", new Date().toISOString());
+    if (cleanupError) return fail("DEVICE_CHALLENGE_UNAVAILABLE", "Could not prepare device challenge storage.", 503);
+
     const { data, error } = await supabase.from("device_challenges").insert({
       owner_id: owner.user.id,
       device_id: deviceId,
