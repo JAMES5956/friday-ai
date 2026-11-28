@@ -23,7 +23,7 @@ describe("device proof-of-possession migration", () => {
     expect(migration).toMatch(/d\.status = 'active'/i);
   });
 
-  it("allows only a one-time consume transition before expiry", () => {
+  it("allows only a one-time consume transition before expiry and owner-only expiry cleanup", () => {
     expect(migration).toMatch(/create policy "Owners consume their own challenges once"[\s\S]*using/i);
     expect(migration).toMatch(/consumed_at is null/i);
     expect(migration).toMatch(/expires_at > now\(\)/i);
