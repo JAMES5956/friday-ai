@@ -38,15 +38,36 @@ export async function POST(request: Request) {
     }
 
     const supabase = await createClient();
-    const { data, error } = await supabase.rpc("consume_device_challenge", {
-      p_challenge_id: values.challengeId
-    });
+    const now = new Date().toISOString();
+    const { data: challenge, error: challengeError } = await supabase.from("device_challenges")
+      .update({ consumed_at: now })
+      .eq("id", values.challengeId)
+      .eq("owner_id", owner.user.id)
+      .gt("expires_at", now)
+      .is("consumed_at", null)
+      .select("device_id, nonce, expires_at")
+      .maybeSingle();
 
-    const challenge = Array.isArray(data) ? data[0] : null;
-    if (error || !challenge || challenge.owner_id !== owner.user.id ||
-        typeof challenge.device_id !== "string" || typeof challenge.nonce !== "string" ||
-        typeof challenge.expires_at !== "string" || typeof challenge.public_key !== "string") {
+    if (challengeError) {
+      return fail("DEVICE_CHALLENGE_UNAVAILABLE", "Could not verify the device challenge.", 503);
+    }
+    if (!challenge || typeof challenge.device_id !== "string" ||
+        typeof challenge.nonce !== "string" || typeof challenge.expires_at !== "string") {
       return fail("DEVICE_CHALLENGE_INVALID", "The device challenge is expired, already used or unavailable.", 401);
+    }
+
+    const { data: device, error: deviceError } = await supabase.from("owner_devices")
+      .select("public_key")
+      .eq("owner_id", owner.user.id)
+      .eq("device_id", challenge.device_id)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (deviceError) {
+      return fail("DEVICE_REGISTRY_UNAVAILABLE", "Could not retrieve the active device key.", 503);
+    }
+    if (!device || typeof device.public_key !== "string") {
+      return fail("DEVICE_CHALLENGE_INVALID", "The registered device is no longer active.", 401);
     }
 
     const expiresAt = new Date(challenge.expires_at);
@@ -62,7 +83,7 @@ export async function POST(request: Request) {
       expiresAt: String(expiresAt.getTime())
     });
 
-    if (!verifyDeviceProof(challenge.public_key, message, values.signature)) {
+    if (!verifyDeviceProof(device.public_key, message, values.signature)) {
       return fail("DEVICE_PROOF_REJECTED", "The device could not prove possession of its registered private key.", 401);
     }
 
