@@ -41,6 +41,7 @@ describe("owner MFA verification route", () => {
       body: JSON.stringify({ action: "verify", factorId, code: "12a456" })
     }));
 
+    if (!response) throw new Error("Route returned no response.");
     expect(response.status).toBe(400);
     expect(challenge).not.toHaveBeenCalled();
     expect(verify).not.toHaveBeenCalled();
@@ -55,6 +56,7 @@ describe("owner MFA verification route", () => {
       body: JSON.stringify({ action: "verify", factorId, code: "123456" })
     }));
 
+    if (!response) throw new Error("Route returned no response.");
     expect(response.status).toBe(404);
     expect(challenge).not.toHaveBeenCalled();
   });
@@ -68,6 +70,7 @@ describe("owner MFA verification route", () => {
       body: JSON.stringify({ action: "verify", factorId, code: "123456" })
     }));
 
+    if (!response) throw new Error("Route returned no response.");
     expect(response.status).toBe(503);
     expect(verify).not.toHaveBeenCalled();
   });
