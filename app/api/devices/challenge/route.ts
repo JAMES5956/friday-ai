@@ -40,22 +40,23 @@ export async function POST(request: Request) {
     const nonce = randomBytes(32).toString("base64url");
     const expiresAt = new Date(Date.now() + 120_000).toISOString();
     const supabase = await createClient();
-    const { data, error } = await supabase.rpc("issue_device_challenge", {
-      p_device_id: deviceId,
-      p_nonce: nonce,
-      p_expires_at: expiresAt
-    });
+    const { data, error } = await supabase.from("device_challenges").insert({
+      owner_id: owner.user.id,
+      device_id: deviceId,
+      nonce,
+      expires_at: expiresAt
+    }).select("id").single();
 
     if (error) {
-      const status = error.code === "P0002" ? 404 : 503;
+      const status = error.code === "42501" || error.code === "23503" ? 404 : 503;
       return fail("DEVICE_CHALLENGE_UNAVAILABLE", "Could not issue a challenge for this active device.", status);
     }
-    if (typeof data !== "string") {
+    if (typeof data?.id !== "string") {
       return fail("DEVICE_CHALLENGE_UNAVAILABLE", "Could not issue a challenge for this active device.", 503);
     }
 
     const message = buildDeviceProofMessage({
-      challengeId: data,
+      challengeId: data.id,
       ownerId: owner.user.id,
       deviceId,
       nonce,
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({
-      challengeId: data,
+      challengeId: data.id,
       message,
       expiresAt
     }, { headers: { "Cache-Control": "no-store", Pragma: "no-cache" } });
