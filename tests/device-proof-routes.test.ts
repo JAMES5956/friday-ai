@@ -5,7 +5,8 @@ import { buildDeviceProofMessage } from "@/lib/security/device-proof";
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   getOwnerSession: vi.fn(),
-  from: vi.fn()
+  from: vi.fn(),
+  rpc: vi.fn()
 }));
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
@@ -21,8 +22,10 @@ describe("NEXUS device proof API", () => {
   const challengeQuery = {
     insert: vi.fn(),
     update: vi.fn(),
+    delete: vi.fn(),
     eq: vi.fn(),
     gt: vi.fn(),
+    lt: vi.fn(),
     is: vi.fn(),
     select: vi.fn(),
     single: vi.fn(),
@@ -37,6 +40,7 @@ describe("NEXUS device proof API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getOwnerSession.mockResolvedValue({ user: { id: ownerId }, reason: null });
+    mocks.rpc.mockResolvedValue({ data: true, error: null });
     for (const query of [challengeQuery, deviceQuery]) {
       for (const method of Object.values(query)) method.mockReturnThis();
     }
@@ -51,7 +55,7 @@ describe("NEXUS device proof API", () => {
     });
     deviceQuery.maybeSingle.mockResolvedValue({ data: { public_key: "unused" }, error: null });
     mocks.from.mockImplementation((table: string) => table === "device_challenges" ? challengeQuery : deviceQuery);
-    mocks.createClient.mockResolvedValue({ from: mocks.from });
+    mocks.createClient.mockResolvedValue({ from: mocks.from, rpc: mocks.rpc });
   });
 
   it("issues a short-lived challenge only after owner MFA", async () => {
@@ -63,6 +67,9 @@ describe("NEXUS device proof API", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.getOwnerSession).toHaveBeenCalledWith({ requireMfa: true });
+    expect(mocks.rpc).toHaveBeenCalledWith("consume_rate_limit", { p_limit: 10 });
+    expect(challengeQuery.delete).toHaveBeenCalledOnce();
+    expect(challengeQuery.lt).toHaveBeenCalledWith("expires_at", expect.any(String));
     expect(mocks.from).toHaveBeenCalledWith("device_challenges");
     expect(challengeQuery.insert).toHaveBeenCalledWith(expect.objectContaining({
       owner_id: ownerId,
@@ -104,6 +111,7 @@ describe("NEXUS device proof API", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ verified: true, deviceId });
     expect(mocks.getOwnerSession).toHaveBeenCalledWith({ requireMfa: true });
+    expect(mocks.rpc).toHaveBeenCalledWith("consume_rate_limit", { p_limit: 10 });
     expect(challengeQuery.update).toHaveBeenCalledWith(expect.objectContaining({ consumed_at: expect.any(String) }));
     expect(challengeQuery.eq).toHaveBeenCalledWith("owner_id", ownerId);
     expect(challengeQuery.is).toHaveBeenCalledWith("consumed_at", null);
