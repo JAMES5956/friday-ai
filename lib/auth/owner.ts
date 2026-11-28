@@ -29,7 +29,7 @@ export async function getOwnerSession(options: OwnerSessionOptions = {}) {
     if (assuranceError) {
       return { user: null, reason: "MFA_CHECK_FAILED" as const };
     }
-    if (assurance.nextLevel === "aal2" && assurance.currentLevel !== "aal2") {
+    if (assurance.currentLevel !== "aal2") {
       return { user: null, reason: "MFA_REQUIRED" as const };
     }
   }
