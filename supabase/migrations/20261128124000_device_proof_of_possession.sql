@@ -22,11 +22,11 @@ alter table public.device_challenges enable row level security;
 revoke all on table public.device_challenges from public, anon, authenticated, service_role;
 grant select on table public.device_challenges to authenticated;
 grant insert (owner_id, device_id, nonce, expires_at) on table public.device_challenges to authenticated;
-grant update (consumed_at) on table public.device_challenges to authenticated;
+grant update (consumed_at) on table public.device_challenges to authenticated;\ngrant delete on table public.device_challenges to authenticated;
 
 drop policy if exists "Owners read their own device challenges" on public.device_challenges;
 drop policy if exists "Owners issue challenges for active devices" on public.device_challenges;
-drop policy if exists "Owners consume their own challenges once" on public.device_challenges;
+drop policy if exists "Owners consume their own challenges once" on public.device_challenges;\ndrop policy if exists "Owners clean up expired challenges" on public.device_challenges;
 
 create policy "Owners read their own device challenges"
   on public.device_challenges for select to authenticated
@@ -55,6 +55,13 @@ create policy "Owners consume their own challenges once"
   with check (
     (select auth.uid()) = owner_id
     and consumed_at is not null
+  );
+
+create policy "Owners clean up expired challenges"
+  on public.device_challenges for delete to authenticated
+  using (
+    (select auth.uid()) = owner_id
+    and expires_at <= now()
   );
 
 comment on table public.device_challenges is
