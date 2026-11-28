@@ -49,7 +49,7 @@ describe("NEXUS device proof API", () => {
   it("accepts a valid Ed25519 proof and consumes the challenge through the owner-bound RPC", async () => {
     const { publicKey, privateKey } = generateKeyPairSync("ed25519");
     const publicKeyBase64 = publicKey.export({ type: "spki", format: "der" }).toString("base64");
-    const expiresAt = "2026-11-28T13:00:00.000Z";
+    const expiresAt = new Date(Date.now() + 120_000).toISOString();
     const nonce = "a".repeat(43);
     const message = buildDeviceProofMessage({
       challengeId,
@@ -94,7 +94,7 @@ describe("NEXUS device proof API", () => {
         owner_id: ownerId,
         device_id: deviceId,
         nonce: "a".repeat(43),
-        expires_at: "2026-11-28T13:00:00.000Z",
+        expires_at: new Date(Date.now() + 120_000).toISOString(),
         public_key: publicKeyBase64
       }],
       error: null
