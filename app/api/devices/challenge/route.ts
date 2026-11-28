@@ -1,0 +1,84 @@
+import { randomBytes } from "node:crypto";
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { getOwnerSession } from "@/lib/auth/owner";
+import { buildDeviceProofMessage } from "@/lib/security/device-proof";
+
+export const runtime = "nodejs";
+
+const DEVICE_ID = /^[A-Za-z0-9._:-]{16,128}$/;
+
+function fail(code: string, message: string, status: number) {
+  return NextResponse.json(
+    { error: { code, message } },
+    { status, headers: { "Cache-Control": "no-store" } }
+  );
+}
+
+export async function POST(request: Request) {
+  try {
+    const owner = await getOwnerSession({ requireMfa: true });
+    if (!owner.user) {
+      const status = owner.reason === "MFA_REQUIRED" ? 403 : owner.reason === "MFA_CHECK_FAILED" ? 503 : 401;
+      return fail("OWNER_AUTH_REQUIRED", "Sign in as the authorised owner and verify MFA.", status);
+    }
+
+    const contentType = (request.headers.get("content-type") ?? "").toLowerCase();
+    if (!contentType.includes("application/json")) return fail("INVALID_PAYLOAD", "Send a JSON object.", 400);
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).byteLength > 2_048) return fail("REQUEST_TOO_LARGE", "Request is too large.", 413);
+    const payload: unknown = JSON.parse(raw);
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return fail("INVALID_PAYLOAD", "Send a JSON object.", 400);
+    }
+
+    const deviceId = (payload as Record<string, unknown>).deviceId;
+    if (typeof deviceId !== "string" || !DEVICE_ID.test(deviceId)) {
+      return fail("INVALID_DEVICE", "Provide a valid registered device ID.", 400);
+    }
+
+    const nonce = randomBytes(32).toString("base64url");
+    const expiresAt = new Date(Date.now() + 120_000).toISOString();
+    const supabase = await createClient();
+    const { data: allowed, error: rateError } = await supabase.rpc("consume_rate_limit", { p_limit: 10 });
+    if (rateError) return fail("SECURITY_LIMITER_UNAVAILABLE", "NEXUS request protection is unavailable.", 503);
+    if (!allowed) return fail("RATE_LIMITED", "Too many device challenges. Wait before trying again.", 429);
+
+    const { error: cleanupError } = await supabase.from("device_challenges")
+      .delete()
+      .eq("owner_id", owner.user.id)
+      .lt("expires_at", new Date().toISOString());
+    if (cleanupError) return fail("DEVICE_CHALLENGE_UNAVAILABLE", "Could not prepare device challenge storage.", 503);
+
+    const { data, error } = await supabase.from("device_challenges").insert({
+      owner_id: owner.user.id,
+      device_id: deviceId,
+      nonce,
+      expires_at: expiresAt
+    }).select("id").single();
+
+    if (error) {
+      const status = error.code === "42501" || error.code === "23503" ? 404 : 503;
+      return fail("DEVICE_CHALLENGE_UNAVAILABLE", "Could not issue a challenge for this active device.", status);
+    }
+    if (typeof data?.id !== "string") {
+      return fail("DEVICE_CHALLENGE_UNAVAILABLE", "Could not issue a challenge for this active device.", 503);
+    }
+
+    const message = buildDeviceProofMessage({
+      challengeId: data.id,
+      ownerId: owner.user.id,
+      deviceId,
+      nonce,
+      expiresAt: String(Date.parse(expiresAt))
+    });
+
+    return NextResponse.json({
+      challengeId: data.id,
+      message,
+      expiresAt
+    }, { headers: { "Cache-Control": "no-store", Pragma: "no-cache" } });
+  } catch {
+    return fail("DEVICE_CHALLENGE_UNAVAILABLE", "Could not issue a device challenge.", 503);
+  }
+}

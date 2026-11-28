@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { generateKeyPairSync } from "node:crypto";
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
@@ -9,6 +10,9 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
 vi.mock("@/lib/auth/owner", () => ({ getOwnerSession: mocks.getOwnerSession }));
 
 import { POST } from "../app/api/devices/route";
+
+const validPublicKey = generateKeyPairSync("ed25519").publicKey
+  .export({ type: "spki", format: "der" }).toString("base64");
 
 describe("NEXUS device registration API", () => {
   const insert = vi.fn();
@@ -36,7 +40,7 @@ describe("NEXUS device registration API", () => {
     mocks.createClient.mockResolvedValue({ from });
   });
 
-  it("uses the database default for active status and requires MFA", async () => {
+  it("rejects a non-Ed25519 public key before inserting a device", async () => {
     const response = await POST(new Request("https://friday.test/api/devices", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -45,6 +49,23 @@ describe("NEXUS device registration API", () => {
         deviceName: "Boss phone",
         platform: "android",
         publicKey: "p".repeat(48)
+      })
+    }));
+
+    if (!response) throw new Error("Route returned no response.");
+    expect(response.status).toBe(400);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("uses the database default for active status and requires MFA", async () => {
+    const response = await POST(new Request("https://friday.test/api/devices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        deviceId: "device-id-12345678",
+        deviceName: "Boss phone",
+        platform: "android",
+        publicKey: validPublicKey
       })
     }));
 
@@ -57,7 +78,7 @@ describe("NEXUS device registration API", () => {
       device_id: "device-id-12345678",
       device_name: "Boss phone",
       platform: "android",
-      public_key: "p".repeat(48)
+      public_key: validPublicKey
     });
     expect(insert.mock.calls[0][0]).not.toHaveProperty("status");
   });

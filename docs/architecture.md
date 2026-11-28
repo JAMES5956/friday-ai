@@ -4,12 +4,12 @@
 
 FRIDAY is a pre-deployment, owner-only web application. It contains a central conversational assistant, encrypted conversation and memory storage, an initial NEXUS security gate, and an owner-controlled specialist task workflow.
 
-The application is not deployed. Voice is browser-based and foreground-only; telephony, native background wake-word detection, device control, emergency protocols, autonomous services and virtual headquarters integrations are not operational.
+The application is not deployed. Voice is browser-based and foreground-only; telephony, native background wake-word detection, device control, emergency protocols, autonomous services and virtual headquarters integrations are not operational. Device proof-of-possession API code and its migration are staged but the migration has not been applied to the live Supabase project, and no native client yet generates/stores device keys or signs challenges.
 
 ## Architecture
 
 - **Web client:** Next.js responsive owner workspace with conversation history, browser speech controls, specialist task center and conceptual corporate headquarters preview.
-- **Identity boundary:** Supabase Auth, server-side owner email allowlist and protected private routes.
+- **Identity boundary:** Supabase Auth, server-side owner email allowlist and protected private routes. Sensitive owner APIs require an AAL2 session even when no authenticator has yet been enrolled; the security setup page remains available to bootstrap the first TOTP factor. Registered device keys use Ed25519 SPKI public keys and owner-bound, expiring, single-use proof challenges.
 - **Application APIs:** server routes for assistant conversations, specialist tasks and memory sharing, plus security and health endpoints.
 - **FRIDAY orchestrator:** central assistant identity, conversation context construction, model routing and response synthesis.
 - **Model adapter:** OpenAI-compatible chat-completions interface using server-only provider configuration and bounded request timeouts.

@@ -22,9 +22,10 @@ The repository now contains:
 - Encrypted Project Continuity workspace for owner-managed project objectives, status, priority, specialist ownership, dated milestones and tasks, progress updates and blockers. Project records are owner-scoped and are not included in model context automatically; the owner may explicitly select up to three active projects for one message, after which the selection clears.
 - NEXUS Backup & Recovery: owner-scoped portable backups of encrypted data and required metadata, HMAC-signed manifests, ciphertext and record-integrity verification, and non-destructive recovery dry runs. No automatic restore or overwrite is enabled.
 - FRIDAY can review completed specialist outputs, challenge assumptions and save its synthesis into the owner conversation history.
-- Owner device inventory API with MFA-gated registration and one-way revocation; public-key proof-of-possession and device client UI are not implemented yet.\n- Automated dependency audit, lint, unit tests, TypeScript and production-build checks.
+- Owner device inventory API with MFA-gated registration and one-way revocation. Device registration now validates Ed25519 public keys, and owner-bound, short-lived, single-use challenge/verification endpoints implement cryptographic proof-of-possession. A native device key-generation and signing client is still pending.
+- Automated dependency audit, lint, unit tests, TypeScript and production-build checks.
 
-The connected Vercel project automatically creates production-target deployments on pushes to main; the project has SSO deployment protection and the latest code must pass CI/build checks before it is considered ready. No manual production promotion was performed. Live Supabase migration 0014 was applied with no row deletions or data rewrites. Authentication, database-backed memory and model responses still require private infrastructure configuration and end-to-end verification.
+The connected Vercel project automatically creates production-target deployments on pushes to main; the project has SSO deployment protection. No manual production promotion was performed. Live Supabase migration 20261127075441 was applied with no row deletions or data rewrites. The device proof-of-possession migration 20261128124000 is staged in code and has not been applied to the live project. Authentication, device key enrollment, database-backed memory and model responses still require private infrastructure configuration and end-to-end verification.
 
 ## Design documentation
 
@@ -57,7 +58,7 @@ Requirements: Node.js 20.9+ and npm.
 3. In Supabase Authentication, enable email/password sign-in and disable public sign-ups.
 4. Create the owner account manually in the Supabase dashboard.
 5. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `FRIDAY_OWNER_EMAIL`.
-6. Apply only migrations that are not already recorded, in order: `0001_friday_core.sql` through `0013_owner_device_registry.sql`, followed by `20261127075441_correct_live_security_permissions.sql`. Verify the Supabase migration history first. The live project has migrations 0001–0014 recorded; do not reapply them.
+6. Apply only migrations that are not already recorded, in order: `0001_friday_core.sql` through `0013_owner_device_registry.sql`, followed by `20261127075441_correct_live_security_permissions.sql` and `20261128124000_device_proof_of_possession.sql`. Verify the Supabase migration history first. The live project has migrations 0001–0013 and `20261127075441` recorded. The device proof-of-possession migration is pending and must not be applied until separately approved.
 7. Generate an application encryption key locally with `openssl rand -base64 32` and set `FRIDAY_DATA_ENCRYPTION_KEY`. Keep a secure offline backup of this key. Losing it makes encrypted stored data unrecoverable.
 8. Configure `AI_BASE_URL`, `AI_MODEL`, and `AI_API_KEY` only after choosing and approving a model provider. The API key is server-only and must never use a `NEXT_PUBLIC_` prefix.
 9. To enable a specialist, also set its dedicated model variable (for example `AI_ORACLE_MODEL` or `AI_FORGE_MODEL`). Specialist execution deliberately has no fallback to `AI_MODEL`; each delegated agent must have its own configured model. All configured models use the shared server-side provider URL and key.
@@ -93,14 +94,16 @@ GitHub Actions runs the same checks for commits to `main` and `foundation/**` br
 - A model provider must be configured before FRIDAY can generate responses.
 - Specialist tasks run only after an explicit owner action. Sensitive tasks additionally require recorded owner approval. Specialist models receive their own working memories plus only the non-restricted memories the owner explicitly shares with them. Sharing grants expire and can be revoked; restricted memories are never shared.
 - Specialist workers return text results only. They cannot call tools, send communications, publish, make purchases or control devices.
-- Voice, telephony, device control, emergency protocols and the virtual headquarters are not yet operational. Browser voice input is only a foreground prototype. Device registration currently records inventory metadata; it does not yet cryptographically prove device possession.
+- Voice, telephony, device control, emergency protocols and the virtual headquarters are not yet operational. Browser voice input is only a foreground prototype. Device proof-of-possession server code is staged, but the database migration and native key-generation/signing client are still pending; registered devices must not yet be treated as cryptographically trusted.
 - No paid service is activated automatically.
 
 ## Pre-deployment checklist
 
 - [ ] Create and configure the private Supabase project.
 - [ ] Verify the owner account and sign-in flow against the live Supabase project.
-- [ ] Review and explicitly approve pending migrations 0012–0013, then apply them and verify row-level security with negative cross-user tests.\n- [ ] Complete MFA enrollment/sign-in tests against the live owner account and test authenticator recovery.\n- [ ] Implement device proof-of-possession before treating registered devices as trusted endpoints.
+- [ ] Review and explicitly approve the pending `20261128124000_device_proof_of_possession.sql` migration, then apply it and verify owner isolation, active-device checks and replay rejection.
+- [ ] Complete MFA enrollment/sign-in tests against the live owner account and test authenticator recovery.
+- [ ] Build the native device key-generation/signing client and complete end-to-end device proof-of-possession testing.
 - [ ] Securely store and back up the encryption key; test encryption/decryption and recovery.
 - [ ] Select and approve the AI provider and its cost/retention terms.
 - [x] Verify NEXUS rate-limit RPC permissions and remove direct client access to rate-limit counters.
