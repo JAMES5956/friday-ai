@@ -34,6 +34,44 @@ describe("owner MFA verification route", () => {
     });
   });
 
+  it("rejects malformed authenticator codes before creating a challenge", async () => {
+    const response = await POST(new Request("https://friday.test/api/security/mfa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "verify", factorId, code: "12a456" })
+    }));
+
+    expect(response.status).toBe(400);
+    expect(challenge).not.toHaveBeenCalled();
+    expect(verify).not.toHaveBeenCalled();
+  });
+
+  it("does not challenge a factor that does not belong to the signed-in owner", async () => {
+    listFactors.mockResolvedValue({ data: { totp: [{ id: "223e4567-e89b-42d3-a456-426614174000", status: "verified" }] }, error: null });
+
+    const response = await POST(new Request("https://friday.test/api/security/mfa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "verify", factorId, code: "123456" })
+    }));
+
+    expect(response.status).toBe(404);
+    expect(challenge).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when Supabase cannot create an MFA challenge", async () => {
+    challenge.mockResolvedValue({ data: null, error: new Error("challenge unavailable") });
+
+    const response = await POST(new Request("https://friday.test/api/security/mfa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "verify", factorId, code: "123456" })
+    }));
+
+    expect(response.status).toBe(503);
+    expect(verify).not.toHaveBeenCalled();
+  });
+
   it("allows an enrolled verified factor to complete a sign-in challenge", async () => {
     const response = await POST(new Request("https://friday.test/api/security/mfa", {
       method: "POST",
