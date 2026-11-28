@@ -46,8 +46,12 @@ export async function POST(request: Request) {
       p_expires_at: expiresAt
     });
 
-    if (error || typeof data !== "string") {
-      return fail("DEVICE_CHALLENGE_UNAVAILABLE", "Could not issue a challenge for this active device.", 404);
+    if (error) {
+      const status = error.code === "P0002" ? 404 : 503;
+      return fail("DEVICE_CHALLENGE_UNAVAILABLE", "Could not issue a challenge for this active device.", status);
+    }
+    if (typeof data !== "string") {
+      return fail("DEVICE_CHALLENGE_UNAVAILABLE", "Could not issue a challenge for this active device.", 503);
     }
 
     const message = buildDeviceProofMessage({
