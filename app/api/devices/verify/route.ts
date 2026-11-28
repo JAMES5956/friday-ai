@@ -38,6 +38,10 @@ export async function POST(request: Request) {
     }
 
     const supabase = await createClient();
+    const { data: allowed, error: rateError } = await supabase.rpc("consume_rate_limit", { p_limit: 10 });
+    if (rateError) return fail("SECURITY_LIMITER_UNAVAILABLE", "NEXUS request protection is unavailable.", 503);
+    if (!allowed) return fail("RATE_LIMITED", "Too many device proof attempts. Wait before trying again.", 429);
+
     const now = new Date().toISOString();
     const { data: challenge, error: challengeError } = await supabase.from("device_challenges")
       .update({ consumed_at: now })
