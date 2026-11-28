@@ -14,6 +14,7 @@ describe("device proof-of-possession migration", () => {
     expect(migration).toMatch(/grant select on table public\.device_challenges to authenticated/i);
     expect(migration).toMatch(/grant insert \(owner_id, device_id, nonce, expires_at\) on table public\.device_challenges to authenticated/i);
     expect(migration).toMatch(/grant update \(consumed_at\) on table public\.device_challenges to authenticated/i);
+    expect(migration).toMatch(/grant delete on table public\.device_challenges to authenticated/i);
   });
 
   it("requires ownership and an active registered device to issue a challenge", () => {
@@ -23,10 +24,11 @@ describe("device proof-of-possession migration", () => {
     expect(migration).toMatch(/d\.status = 'active'/i);
   });
 
-  it("allows only a one-time consume transition before expiry and owner-only expiry cleanup", () => {
+  it("allows only a one-time consume transition and owner-only expiry cleanup", () => {
     expect(migration).toMatch(/create policy "Owners consume their own challenges once"[\s\S]*using/i);
     expect(migration).toMatch(/consumed_at is null/i);
     expect(migration).toMatch(/expires_at > now\(\)/i);
     expect(migration).toMatch(/with check \([\s\S]*consumed_at is not null/i);
+    expect(migration).toMatch(/create policy "Owners clean up expired challenges"[\s\S]*expires_at <= now\(\)/i);
   });
 });
