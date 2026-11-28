@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       ownerId: owner.user.id,
       deviceId: challenge.device_id,
       nonce: challenge.nonce,
-      expiresAt: challenge.expires_at
+      expiresAt: String(expiresAt.getTime())
     });
 
     if (!verifyDeviceProof(challenge.public_key, message, values.signature)) {
